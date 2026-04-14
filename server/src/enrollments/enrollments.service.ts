@@ -48,4 +48,19 @@ export class EnrollmentsService {
       where: { user: { id: userId } },
     });
   }
+
+  async findMyEnrollmentByCourse(userId: number, courseId: number) {
+    const enrollment = await this.enrollmentRepo.findOne({
+      where: {
+        user: { id: userId },
+        course: { id: courseId },
+      },
+    });
+
+    if (!enrollment) {
+      throw new NotFoundException('Enrollment not found for this course');
+    }
+
+    return enrollment;
+  }
 }

@@ -25,4 +25,15 @@ export class EnrollmentsController {
   myCourses(@Request() req) {
     return this.enrollmentService.findMyCourses(req.user.userId);
   }
+
+  @Get('course/:courseId')
+  enrollmentForCourse(
+    @Param('courseId') courseId: string,
+    @Request() req,
+  ) {
+    return this.enrollmentService.findMyEnrollmentByCourse(
+      req.user.userId,
+      +courseId,
+    );
+  }
 }

@@ -32,4 +32,54 @@ export class QuestionsService {
 
     return this.questionRepo.save(question);
   }
+
+  async updateQuestion(
+    id: number,
+    dto: Partial<{
+      question: string;
+      options: string[];
+      correctAnswer: string;
+      testId: number;
+    }>,
+  ) {
+    const question = await this.questionRepo.findOne({
+      where: { id },
+      relations: ['test'],
+    });
+
+    if (!question) {
+      throw new NotFoundException('Question not found');
+    }
+
+    if (dto.testId !== undefined) {
+      const test = await this.testRepo.findOne({
+        where: { id: dto.testId },
+      });
+
+      if (!test) {
+        throw new NotFoundException('Test not found');
+      }
+
+      question.test = test;
+    }
+
+    if (dto.question !== undefined) question.question = dto.question;
+    if (dto.options !== undefined) question.options = dto.options;
+    if (dto.correctAnswer !== undefined) {
+      question.correctAnswer = dto.correctAnswer;
+    }
+
+    return this.questionRepo.save(question);
+  }
+
+  async deleteQuestion(id: number) {
+    const question = await this.questionRepo.findOne({ where: { id } });
+
+    if (!question) {
+      throw new NotFoundException('Question not found');
+    }
+
+    await this.questionRepo.remove(question);
+    return { message: 'Question deleted successfully' };
+  }
 }

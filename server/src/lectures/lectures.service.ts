@@ -4,10 +4,19 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Lecture } from '../entities/lecture.entity';
 import { Repository } from 'typeorm';
 import { Course } from '../entities/course.entity';
-import { Enrollment } from 'src/entities/enrollment.entity';
+import { Enrollment } from '../entities/enrollment.entity';
+import { Lecture } from '../entities/lecture.entity';
+
+type CreateLectureDto = {
+  courseId: number;
+  title: string;
+  content: string;
+  date: Date;
+};
+
+type UpdateLectureDto = Partial<CreateLectureDto>;
 
 @Injectable()
 export class LecturesService {
@@ -22,7 +31,7 @@ export class LecturesService {
     private enrollmentRepo: Repository<Enrollment>,
   ) {}
 
-  async create(dto: any) {
+  async create(dto: CreateLectureDto) {
     const course = await this.courseRepo.findOne({
       where: { id: dto.courseId },
     });
@@ -35,7 +44,7 @@ export class LecturesService {
       title: dto.title,
       content: dto.content,
       date: dto.date,
-      course: course,
+      course,
     });
 
     return this.lectureRepo.save(lecture);
@@ -55,12 +64,50 @@ export class LecturesService {
 
     return this.lectureRepo.find({
       where: { course: { id: courseId } },
+      relations: ['course'],
     });
   }
 
   findAll() {
     return this.lectureRepo.find({
-      relations: ['course'], // 👈 optional but useful
+      relations: ['course'],
     });
+  }
+
+  async updateLecture(lectureId: number, dto: UpdateLectureDto) {
+    const lecture = await this.lectureRepo.findOne({ where: { id: lectureId } });
+
+    if (!lecture) {
+      throw new NotFoundException('Lecture not found');
+    }
+
+    if (dto.courseId !== undefined) {
+      const course = await this.courseRepo.findOne({
+        where: { id: dto.courseId },
+      });
+
+      if (!course) {
+        throw new NotFoundException('Course not found');
+      }
+
+      lecture.course = course;
+    }
+
+    if (dto.title !== undefined) lecture.title = dto.title;
+    if (dto.content !== undefined) lecture.content = dto.content;
+    if (dto.date !== undefined) lecture.date = dto.date;
+
+    return this.lectureRepo.save(lecture);
+  }
+
+  async deleteLecture(lectureId: number) {
+    const lecture = await this.lectureRepo.findOne({ where: { id: lectureId } });
+
+    if (!lecture) {
+      throw new NotFoundException('Lecture not found');
+    }
+
+    await this.lectureRepo.remove(lecture);
+    return { message: 'Lecture deleted successfully' };
   }
 }

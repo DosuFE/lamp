@@ -1,9 +1,11 @@
 import {
   Body,
   Controller,
+  Delete,
   ForbiddenException,
   Get,
   Param,
+  Patch,
   Post,
   Request,
   UseGuards,
@@ -24,6 +26,7 @@ export class LecturesController {
 
     return this.lectureService.create(dto);
   }
+
   @UseGuards(AuthGuard('jwt'))
   @Get('course/:courseId')
   findByCourse(@Param('courseId') courseId: number, @Request() req) {
@@ -33,5 +36,25 @@ export class LecturesController {
   @Get()
   findAll() {
     return this.lectureService.findAll();
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Patch(':id')
+  updateLecture(@Param('id') id: string, @Body() dto: any, @Request() req) {
+    if (req.user.role !== 'admin') {
+      throw new ForbiddenException('Only admin can update lecture');
+    }
+
+    return this.lectureService.updateLecture(+id, dto);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Delete(':id')
+  deleteLecture(@Param('id') id: string, @Request() req) {
+    if (req.user.role !== 'admin') {
+      throw new ForbiddenException('Only admin can delete lecture');
+    }
+
+    return this.lectureService.deleteLecture(+id);
   }
 }
