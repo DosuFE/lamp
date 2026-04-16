@@ -56,6 +56,7 @@ export class LecturesService {
         user: { id: userId },
         course: { id: courseId },
       },
+      relations: ['user', 'course'],
     });
 
     if (!enrollment) {
@@ -65,6 +66,7 @@ export class LecturesService {
     return this.lectureRepo.find({
       where: { course: { id: courseId } },
       relations: ['course'],
+      order: { date: 'ASC' },
     });
   }
 
@@ -75,7 +77,9 @@ export class LecturesService {
   }
 
   async updateLecture(lectureId: number, dto: UpdateLectureDto) {
-    const lecture = await this.lectureRepo.findOne({ where: { id: lectureId } });
+    const lecture = await this.lectureRepo.findOne({
+      where: { id: lectureId },
+    });
 
     if (!lecture) {
       throw new NotFoundException('Lecture not found');
@@ -101,7 +105,9 @@ export class LecturesService {
   }
 
   async deleteLecture(lectureId: number) {
-    const lecture = await this.lectureRepo.findOne({ where: { id: lectureId } });
+    const lecture = await this.lectureRepo.findOne({
+      where: { id: lectureId },
+    });
 
     if (!lecture) {
       throw new NotFoundException('Lecture not found');

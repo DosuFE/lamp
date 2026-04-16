@@ -55,8 +55,8 @@ export class EnrollmentsService {
         user: { id: userId },
         course: { id: courseId },
       },
+      // relations: ['user', 'course'],
     });
-
     if (!enrollment) {
       throw new NotFoundException('Enrollment not found for this course');
     }

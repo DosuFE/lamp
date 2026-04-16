@@ -25,10 +25,19 @@ export default function LoginPage() {
 
       console.log("LOGIN SUCCESS:", res);
 
-      // ✅ save token
       localStorage.setItem("token", res.access_token);
 
-      // ✅ redirect
+      try {
+        const profile = await api("/auth/profile");
+        if (profile?.role) {
+          localStorage.setItem("role", profile.role);
+        } else {
+          localStorage.removeItem("role");
+        }
+      } catch {
+        localStorage.removeItem("role");
+      }
+
       router.replace("/dashboard");
     } catch (err: any) {
       console.error("LOGIN ERROR:", err.message);

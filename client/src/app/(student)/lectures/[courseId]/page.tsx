@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
 import { api } from "@/app/services/api";
+import { useParams } from "next/navigation";
 
 export default function LecturesPage() {
   const { courseId } = useParams();
@@ -13,63 +13,60 @@ export default function LecturesPage() {
       const res = await api(`/lectures/course/${courseId}`);
       setLectures(res);
     } catch (err: any) {
-      alert(err.message || "Access denied or error fetching lectures");
+      alert("Access denied or no lectures");
     }
   };
 
   useEffect(() => {
-    fetchLectures();
-  }, []);
+    if (courseId) fetchLectures();
+  }, [courseId]);
 
   return (
-    <div className="p-6">
-      {/* HEADER */}
-      <h1 className="text-2xl font-semibold mb-6">
-        Course Lectures
-      </h1>
+    <div className="min-h-screen bg-slate-950 px-4 py-10">
+      <div className="mx-auto max-w-6xl">
+        <div className="mb-8 text-center">
+          <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+            Course Lectures
+          </h1>
+          <p className="mt-2 text-slate-400">
+            Watch videos and review content for this course
+          </p>
+        </div>
 
-      {/* EMPTY STATE */}
-      {lectures.length === 0 && (
-        <p className="text-gray-500">No lectures available yet.</p>
-      )}
-
-      {/* LECTURES LIST */}
-      <div className="space-y-4">
-        {lectures.map((lecture: any) => (
-          <div
-            key={lecture.id}
-            className="bg-white p-4 rounded shadow"
-          >
-            <h2 className="text-lg font-semibold">
-              {lecture.title}
-            </h2>
-
-            <p className="text-sm text-gray-600 mb-3">
-              {lecture.description}
-            </p>
-
-            {/* VIDEO / LINK */}
-            {lecture.videoUrl ? (
-              <video
-                controls
-                className="w-full rounded"
-                src={lecture.videoUrl}
-              />
-            ) : lecture.fileUrl ? (
-              <a
-                href={lecture.fileUrl}
-                target="_blank"
-                className="text-blue-600 underline"
-              >
-                Download Material
-              </a>
-            ) : (
-              <p className="text-gray-400 text-sm">
-                No content uploaded
-              </p>
-            )}
+        {lectures.length === 0 ? (
+          <div className="text-center text-slate-400">
+            No lectures available yet
           </div>
-        ))}
+        ) : (
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {lectures.map((lec: any) => (
+              <div
+                key={lec.id}
+                className="relative overflow-hidden rounded-2xl border border-white/10 bg-slate-900/50 p-6 shadow-[0_20px_60px_rgba(99,102,241,0.15)] backdrop-blur-sm transition duration-200 hover:scale-[1.02] hover:shadow-[0_25px_80px_rgba(99,102,241,0.25)]"
+              >
+                <div className="absolute -top-4 -right-4 h-16 w-16 rounded-full bg-violet-500/20 blur-2xl" />
+                <h2 className="text-lg font-semibold text-white mb-4">
+                  {lec.title}
+                </h2>
+
+                {lec.videoUrl && (
+                  <video
+                    controls
+                    className="w-full rounded-lg mb-4"
+                  >
+                    <source src={lec.videoUrl} />
+                  </video>
+                )}
+
+                {lec.content && (
+                  <p className="text-sm text-slate-400 leading-relaxed">
+                    {lec.content}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
