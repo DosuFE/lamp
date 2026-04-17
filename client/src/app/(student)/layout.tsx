@@ -13,14 +13,7 @@ export default function StudentLayout({
   const router = useRouter();
 
   const [role, setRole] = useState<string | null>(null);
-  // const [loading, setLoading] = useState(true);
-
-  // 🔐 LOAD USER ROLE
-  // useEffect(() => {
-  //   const storedRole = localStorage.getItem("role");
-  //   setRole(storedRole);
-  //   setLoading(false);
-  // }, []);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -39,27 +32,32 @@ export default function StudentLayout({
 
     fetchUser();
   }, []);
-  // ⛔ Prevent UI flicker before role loads
-  // if (loading) return null;
 
   return (
-    <div className="flex h-screen">
+    <div className="flex h-screen bg-slate-950">
       {/* SIDEBAR */}
-      <aside className="w-64 bg-gray-800 text-white p-4">
-        <h2 className="text-xl font-bold mb-6">LAMP</h2>
+      <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 text-white p-4 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 ${
+        sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+      }`}>
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-bold text-white">LAMP</h2>
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="lg:hidden text-white hover:text-slate-300"
+          >
+            ✕
+          </button>
+        </div>
 
-        <nav className="space-y-3">
-          {/* DASHBOARD */}
-          <Link href="/dashboard" className="block hover:text-purple-300">
+        <nav className="space-y-4">
+          <Link href="/dashboard" className="block py-2 px-3 rounded-lg hover:bg-slate-800 hover:text-cyan-300 transition">
             Dashboard
           </Link>
 
-          {/* COURSES */}
-          <Link href="/courses" className="block hover:text-purple-300">
+          <Link href="/courses" className="block py-2 px-3 rounded-lg hover:bg-slate-800 hover:text-cyan-300 transition">
             Courses
           </Link>
 
-          {/* LECTURES */}
           <button
             onClick={() => {
               const courseId = localStorage.getItem("courseId");
@@ -70,45 +68,62 @@ export default function StudentLayout({
               }
 
               router.push(`/lectures/${courseId}`);
+              setSidebarOpen(false);
             }}
-            className="w-full text-left hover:text-purple-300 cursor-pointer"
+            className="w-full text-left py-2 px-3 rounded-lg hover:bg-slate-800 hover:text-cyan-300 transition"
           >
             Lectures
           </button>
 
-          {/* TEST */}
-          <Link href="#" className="block hover:text-purple-300">
-            Test
+          <Link href="/tests" className="block py-2 px-3 rounded-lg hover:bg-slate-800 hover:text-cyan-300 transition">
+            CBT Tests
           </Link>
 
-          {/* RESULTS */}
-          <Link href="/results" className="block hover:text-purple-300">
+          <Link href="/results" className="block py-2 px-3 rounded-lg hover:bg-slate-800 hover:text-cyan-300 transition">
             Results
           </Link>
 
-          {/* 🔥 ADMIN SECTION */}
           {role === "admin" && (
             <>
-              <p className="text-xs text-gray-400 mt-6 mb-2">ADMIN</p>
+              <p className="text-xs text-slate-400 mt-8 mb-2 uppercase tracking-wide">Admin</p>
 
               <Link
                 href="/admin/courses"
-                className="block text-yellow-400 hover:text-yellow-300"
+                className="block py-2 px-3 rounded-lg text-yellow-400 hover:bg-slate-800 hover:text-yellow-300 transition"
               >
                 Manage Courses
+              </Link>
+              <Link
+                href="/admin/tests"
+                className="block py-2 px-3 rounded-lg text-yellow-400 hover:bg-slate-800 hover:text-yellow-300 transition"
+              >
+                Manage Tests (CBT)
               </Link>
             </>
           )}
         </nav>
       </aside>
 
-      {/* MAIN CONTENT */}
-      <div className="flex-1 flex flex-col">
-        {/* TOP BAR */}
-        <header className="bg-purple-600 text-white p-4 flex justify-between">
-          <span>Dashboard</span>
+      {/* OVERLAY for mobile */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black bg-opacity-50 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
 
-          {/* LOGOUT */}
+      {/* MAIN CONTENT */}
+      <div className="flex-1 flex flex-col lg:ml-0">
+        {/* TOP BAR */}
+        <header className="bg-slate-900 text-white p-4 flex justify-between items-center shadow-lg">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="lg:hidden text-white hover:text-slate-300"
+          >
+            ☰
+          </button>
+          <span className="text-lg font-semibold">Dashboard</span>
+
           <button
             onClick={() => {
               localStorage.removeItem("token");
@@ -117,14 +132,14 @@ export default function StudentLayout({
 
               router.replace("/login");
             }}
-            className="bg-purple-700 hover:bg-purple-800 px-3 py-1 rounded transition"
+            className="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg transition"
           >
             Logout
           </button>
         </header>
 
         {/* PAGE CONTENT */}
-        <main className="flex-1 bg-gray-100">{children}</main>
+        <main className="flex-1 bg-slate-950 overflow-auto">{children}</main>
       </div>
     </div>
   );

@@ -37,9 +37,26 @@ export class TestsController {
     return this.testService.deleteTest(+testId);
   }
 
+  @Get('course/:courseId')
+  listByCourse(@Param('courseId') courseId: string, @Request() req) {
+    return this.testService.listByCourse(+courseId, {
+      userId: req.user.userId,
+      role: req.user.role,
+    });
+  }
+
+  @Roles('admin')
+  @Get(':testId/with-answers')
+  getQuestionsWithAnswers(@Param('testId') testId: string) {
+    return this.testService.getTestQuestionsForAdmin(+testId);
+  }
+
   @Get(':testId')
-  getQuestions(@Param('testId') id: number, @Request() req) {
-    return this.testService.getTestQuestions(+id, req.user.userId);
+  getQuestions(@Param('testId') testId: string, @Request() req) {
+    return this.testService.getTestQuestionsForStudent(
+      +testId,
+      req.user.userId,
+    );
   }
 
   @Post(':testId/start')

@@ -13,7 +13,7 @@ export class Result {
   @ManyToOne(() => Test, (test) => test.id)
   test: Test;
 
-  @Column()
+  @Column({ default: 0 })
   score: number;
 
   @Column({ default: 0 })

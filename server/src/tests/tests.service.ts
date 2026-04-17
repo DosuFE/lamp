@@ -98,7 +98,31 @@ export class TestsService {
     return { message: 'Test deleted successfully' };
   }
 
-  async getTestQuestions(testId: number, userId: number) {
+  async listByCourse(
+    courseId: number,
+    user: { userId: number; role?: string },
+  ) {
+    const course = await this.courseRepo.findOne({ where: { id: courseId } });
+    if (!course) {
+      throw new NotFoundException('Course not found');
+    }
+
+    if (user.role !== 'admin') {
+      const enrollment = await this.enrollmentRepo.findOne({
+        where: { user: { id: user.userId }, course: { id: courseId } },
+      });
+      if (!enrollment) {
+        throw new ForbiddenException('Not enrolled');
+      }
+    }
+
+    return this.testRepo.find({
+      where: { course: { id: courseId } },
+      order: { id: 'ASC' },
+    });
+  }
+
+  async getTestQuestionsForStudent(testId: number, userId: number) {
     const test = await this.testRepo.findOne({
       where: { id: testId },
       relations: ['course'],
@@ -119,8 +143,26 @@ export class TestsService {
       throw new ForbiddenException('Not enrolled');
     }
 
+    const rows = await this.questionRepo.find({
+      where: { test: { id: testId } },
+    });
+
+    return rows.map(({ id, question, options }) => ({
+      id,
+      question,
+      options,
+    }));
+  }
+
+  async getTestQuestionsForAdmin(testId: number) {
+    const test = await this.testRepo.findOne({ where: { id: testId } });
+    if (!test) {
+      throw new NotFoundException('Test not found');
+    }
+
     return this.questionRepo.find({
       where: { test: { id: testId } },
+      order: { id: 'ASC' },
     });
   }
 
@@ -176,6 +218,10 @@ export class TestsService {
       where: { user: { id: userId }, test: { id: testId } },
     });
 
+    if (previousAttempt?.isFinalized) {
+      throw new BadRequestException('This test has already been submitted');
+    }
+
     const tabSwitchCount = previousAttempt?.tabSwitchCount ?? 0;
     const webcamOffCount = previousAttempt?.webcamOffCount ?? 0;
     const exceededTime =
@@ -223,16 +269,45 @@ export class TestsService {
       throw new ForbiddenException('Not enrolled');
     }
 
-    const startedAt = dto.startedAt ? new Date(dto.startedAt) : new Date();
     const existing = await this.resultRepo.findOne({
       where: { user: { id: userId }, test: { id: testId } },
     });
 
-    const attempt = existing ?? this.resultRepo.create();
+    if (existing?.isFinalized) {
+      throw new BadRequestException('This test has already been submitted');
+    }
+
+    if (existing && existing.startedAt && !existing.isFinalized) {
+      return {
+        message: 'Attempt in progress',
+        startedAt: existing.startedAt,
+        timeLimitSeconds:
+          existing.timeLimitSeconds ?? test.duration * 60,
+      };
+    }
+
+    const startedAt = dto.startedAt ? new Date(dto.startedAt) : new Date();
+    const limitSec = test.duration * 60;
+
+    const attempt =
+      existing ??
+      this.resultRepo.create({
+        user: { id: userId } as any,
+        test: { id: testId } as any,
+        score: 0,
+        totalQuestions: 0,
+        percentage: 0,
+        grade: 'F',
+        tabSwitchCount: 0,
+        webcamOffCount: 0,
+        malpracticeFlag: false,
+        isFinalized: false,
+      });
+
     attempt.user = { id: userId } as any;
     attempt.test = { id: testId } as any;
     attempt.startedAt = startedAt;
-    attempt.timeLimitSeconds = test.duration * 60;
+    attempt.timeLimitSeconds = limitSec;
     attempt.isFinalized = false;
 
     await this.resultRepo.save(attempt);
@@ -275,7 +350,9 @@ export class TestsService {
   private gradeFromPercentage(percentage: number) {
     if (percentage >= 70) return 'A';
     if (percentage >= 60) return 'B';
-    return 'C';
+    if (percentage >= 50) return 'C';
+    if (percentage >= 40) return 'D';
+    return 'F';
   }
 
   private async findOrCreateAttempt(userId: number, testId: number) {
