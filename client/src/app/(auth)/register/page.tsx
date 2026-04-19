@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/app/services/api";
+import { AppMessageModal } from "@/components/AppMessageModal";
+import type { MessageVariant } from "@/components/AppMessageModal";
+import { OverlayPreloader } from "@/components/OverlayPreloader";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -16,32 +19,65 @@ export default function RegisterPage() {
     password: "",
   });
 
- const register = async () => {
-  try {
-    const res = await api("/auth/register", {
-      method: "POST",
-      body: JSON.stringify({
-        fullName: form.fullName,
-        email: form.email,
-        password: form.password,
-        matricNo: form.matricNo, // ✅ FIXED
-        department: form.department,
-        role: "student", // ✅ REQUIRED
-      }),
-    });
+  const [loading, setLoading] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalTitle, setModalTitle] = useState("");
+  const [modalMessage, setModalMessage] = useState("");
+  const [modalVariant, setModalVariant] = useState<MessageVariant>("info");
+  const [postSuccessToLogin, setPostSuccessToLogin] = useState(false);
 
-    console.log("REGISTER SUCCESS:", res);
+  const register = async () => {
+    try {
+      setLoading(true);
+      const res = await api("/auth/register", {
+        method: "POST",
+        body: JSON.stringify({
+          fullName: form.fullName,
+          email: form.email,
+          password: form.password,
+          matricNo: form.matricNo,
+          department: form.department,
+          role: "student",
+        }),
+      });
 
-    alert("Account created successfully");
-    router.push("/login");
-  } catch (err: any) {
-    console.error("REGISTER ERROR:", err);
-    alert(err.message);
-  }
-};
+      console.log("REGISTER SUCCESS:", res);
+
+      setModalTitle("Account created");
+      setModalMessage("Your account was created successfully. You can sign in now.");
+      setModalVariant("success");
+      setPostSuccessToLogin(true);
+      setModalOpen(true);
+    } catch (err: any) {
+      console.error("REGISTER ERROR:", err);
+      setModalTitle("Registration failed");
+      setModalMessage(err.message || "Could not create account.");
+      setModalVariant("error");
+      setPostSuccessToLogin(false);
+      setModalOpen(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onCloseModal = () => {
+    setModalOpen(false);
+    if (postSuccessToLogin) {
+      setPostSuccessToLogin(false);
+      router.push("/login");
+    }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 px-4 py-10">
+      <OverlayPreloader open={loading} label="Creating your account…" />
+      <AppMessageModal
+        open={modalOpen}
+        title={modalTitle}
+        message={modalMessage}
+        variant={modalVariant}
+        onClose={onCloseModal}
+      />
       <div className="relative w-full max-w-lg overflow-hidden rounded-[2rem] border border-white/10 bg-white/5 px-6 py-8 shadow-[0_30px_90px_rgba(139,92,246,0.22)] backdrop-blur-xl sm:px-10 sm:py-10">
         <div className="absolute inset-x-16 top-0 h-1 rounded-full bg-gradient-to-r from-violet-400 via-fuchsia-500 to-sky-400 opacity-90 blur-2xl" />
 
@@ -98,13 +134,15 @@ export default function RegisterPage() {
         </div>
 
         <button
+          type="button"
           onClick={register}
+          disabled={loading}
           className="mt-8 w-full rounded-2xl bg-gradient-to-r from-violet-500 to-fuchsia-500 px-5 
           py-3 text-base font-semibold text-white shadow-[0_0_40px_rgba(168,85,247,0.35)] 
           transition duration-200 hover:scale-[1.01] hover:shadow-[0_0_55px_rgba(168,85,247,0.45)] 
-          focus:outline-none focus:ring-4 focus:ring-violet-400/30 cursor-pointer"
+          focus:outline-none focus:ring-4 focus:ring-violet-400/30 cursor-pointer disabled:opacity-50 disabled:hover:scale-100"
         >
-          Create Account
+          {loading ? "Creating account…" : "Create Account"}
         </button>
       </div>
     </div>

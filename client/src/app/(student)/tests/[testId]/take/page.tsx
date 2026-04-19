@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { api } from "@/app/services/api";
+import { AppMessageModal } from "@/components/AppMessageModal";
 
 type Q = { id: number; question: string; options: string[] };
 
@@ -85,6 +86,8 @@ export default function TakeTestPage() {
   const [resultSummary, setResultSummary] = useState<any>(null);
   const [tabSwitchCount, setTabSwitchCount] = useState(0);
   const [camLabel, setCamLabel] = useState<string>("Starting camera…");
+  const [submitErrorOpen, setSubmitErrorOpen] = useState(false);
+  const [submitErrorMessage, setSubmitErrorMessage] = useState("");
   const submittedRef = useRef(false);
   const deadlineRef = useRef<number | null>(null);
   const answersRef = useRef<Record<number, string>>({});
@@ -118,7 +121,8 @@ export default function TakeTestPage() {
         if (reason === "timer") {
           setError(e.message || "Submit failed after time expired.");
         } else {
-          alert(e.message);
+          setSubmitErrorMessage(e.message || "Submit failed.");
+          setSubmitErrorOpen(true);
         }
       }
     },
@@ -379,6 +383,13 @@ export default function TakeTestPage() {
 
   return (
     <div className="min-h-screen bg-slate-950 px-4 py-8 text-white">
+      <AppMessageModal
+        open={submitErrorOpen}
+        title="Submit"
+        message={submitErrorMessage}
+        variant="error"
+        onClose={() => setSubmitErrorOpen(false)}
+      />
       <div className="mx-auto max-w-3xl space-y-6">
         <div
           className="rounded-xl border border-amber-500/30 bg-amber-950/40 px-4 py-3 text-sm text-amber-100/90"

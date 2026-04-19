@@ -3,26 +3,40 @@
 import { useEffect, useState } from "react";
 import { api } from "@/app/services/api";
 import { useRouter } from "next/navigation";
+import { AppMessageModal } from "@/components/AppMessageModal";
+import type { MessageVariant } from "@/components/AppMessageModal";
+import { OverlayPreloader } from "@/components/OverlayPreloader";
 
 export default function Courses() {
   const [courses, setCourses] = useState([]);
   const [myCourses, setMyCourses] = useState([]);
   const [loadingId, setLoadingId] = useState<number | null>(null);
+  const [pageLoading, setPageLoading] = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalTitle, setModalTitle] = useState("");
+  const [modalMessage, setModalMessage] = useState("");
+  const [modalVariant, setModalVariant] = useState<MessageVariant>("error");
 
-  const router = useRouter(); 
+  const router = useRouter();
 
   const fetchData = async () => {
+    setPageLoading(true);
     try {
       const allCourses = await api("/courses");
       const enrolled = await api("/enrollments/my-courses");
 
       setCourses(allCourses);
 
-      // extract enrolled course IDs
       const ids = enrolled.map((e: any) => e.course.id);
       setMyCourses(ids);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setModalTitle("Courses");
+      setModalMessage(err.message || "Could not load courses or enrollments.");
+      setModalVariant("error");
+      setModalOpen(true);
+    } finally {
+      setPageLoading(false);
     }
   };
 
@@ -35,19 +49,43 @@ export default function Courses() {
       });
 
       setMyCourses((prev) => [...prev, courseId]);
+      setModalTitle("Enrolled");
+      setModalMessage("You are now enrolled in this course.");
+      setModalVariant("success");
+      setModalOpen(true);
     } catch (err: any) {
-      alert(err.message);
+      setModalTitle("Enrollment");
+      setModalMessage(err.message || "Could not enroll.");
+      setModalVariant("error");
+      setModalOpen(true);
     } finally {
       setLoadingId(null);
     }
   };
 
   useEffect(() => {
-    fetchData();
+    void fetchData();
   }, []);
 
   return (
     <div className="min-h-screen bg-slate-950 px-4 py-10">
+      <OverlayPreloader
+        open={pageLoading || loadingId !== null}
+        label={
+          pageLoading
+            ? "Loading courses…"
+            : loadingId !== null
+              ? "Enrolling…"
+              : undefined
+        }
+      />
+      <AppMessageModal
+        open={modalOpen}
+        title={modalTitle}
+        message={modalMessage}
+        variant={modalVariant}
+        onClose={() => setModalOpen(false)}
+      />
       <div className="mx-auto max-w-6xl">
         <div className="mb-10 rounded-[2rem] border border-white/10 bg-slate-900/85 px-6 py-8 shadow-[0_45px_120px_rgba(99,102,241,0.22)] backdrop-blur-xl sm:px-10 sm:py-12">
           <div className="mb-6 text-center text-white">

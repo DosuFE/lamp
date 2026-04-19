@@ -1,9 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api } from "@/app/services/api";
+import { AppMessageModal } from "@/components/AppMessageModal";
+import type { MessageVariant } from "@/components/AppMessageModal";
+import { OverlayPreloader } from "@/components/OverlayPreloader";
 
 export default function AdminTestsPage() {
   const router = useRouter();
@@ -14,22 +17,43 @@ export default function AdminTestsPage() {
   const [title, setTitle] = useState("");
   const [duration, setDuration] = useState("30");
   const [loading, setLoading] = useState(false);
+  const [coursesLoading, setCoursesLoading] = useState(true);
+  const [testsLoading, setTestsLoading] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalTitle, setModalTitle] = useState("");
+  const [modalMessage, setModalMessage] = useState("");
+  const [modalVariant, setModalVariant] = useState<MessageVariant>("info");
+
+  const showModal = useCallback(
+    (title: string, message: string, variant: MessageVariant) => {
+      setModalTitle(title);
+      setModalMessage(message);
+      setModalVariant(variant);
+      setModalOpen(true);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (localStorage.getItem("role") !== "admin") {
+      setCoursesLoading(false);
       router.replace("/dashboard");
       return;
     }
     setAuthorized(true);
     (async () => {
+      setCoursesLoading(true);
       try {
         const list = await api("/courses");
         setCourses(list);
-      } catch {
+      } catch (e: any) {
         setCourses([]);
+        showModal("Courses", e.message || "Could not load courses.", "error");
+      } finally {
+        setCoursesLoading(false);
       }
     })();
-  }, [router]);
+  }, [router, showModal]);
 
   useEffect(() => {
     if (!courseId) {
@@ -37,11 +61,14 @@ export default function AdminTestsPage() {
       return;
     }
     (async () => {
+      setTestsLoading(true);
       try {
         const list = await api(`/tests/course/${courseId}`);
         setTests(list);
       } catch {
         setTests([]);
+      } finally {
+        setTestsLoading(false);
       }
     })();
   }, [courseId]);
@@ -49,19 +76,19 @@ export default function AdminTestsPage() {
   if (!authorized) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-950 text-white">
-        <p>Checking access...</p>
+        <OverlayPreloader open label="Checking access…" />
       </div>
     );
   }
 
   const createTest = async () => {
     if (!courseId || !title.trim()) {
-      alert("Select a course and enter a test title.");
+      showModal("Create test", "Select a course and enter a test title.", "error");
       return;
     }
     const minutes = Number(duration);
     if (!Number.isFinite(minutes) || minutes < 1) {
-      alert("Duration must be at least 1 minute.");
+      showModal("Create test", "Duration must be at least 1 minute.", "error");
       return;
     }
     try {
@@ -77,15 +104,33 @@ export default function AdminTestsPage() {
       setTitle("");
       const list = await api(`/tests/course/${courseId}`);
       setTests(list);
+      showModal("Create test", "Test created successfully.", "success");
     } catch (e: any) {
-      alert(e.message);
+      showModal("Create test", e.message || "Could not create test.", "error");
     } finally {
       setLoading(false);
     }
   };
 
+  const blocking = coursesLoading || loading || testsLoading;
+  const blockingLabel = coursesLoading
+    ? "Loading courses…"
+    : testsLoading
+      ? "Loading tests…"
+      : loading
+        ? "Saving test…"
+        : undefined;
+
   return (
     <div className="min-h-screen bg-slate-950 px-4 py-10 text-white">
+      <OverlayPreloader open={blocking} label={blockingLabel} />
+      <AppMessageModal
+        open={modalOpen}
+        title={modalTitle}
+        message={modalMessage}
+        variant={modalVariant}
+        onClose={() => setModalOpen(false)}
+      />
       <div className="mx-auto max-w-3xl space-y-8">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <h1 className="text-2xl font-bold">Admin — CBT tests</h1>

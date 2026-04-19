@@ -1,9 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { api } from "@/app/services/api";
+import { AppConfirmModal } from "@/components/AppConfirmModal";
+import { AppMessageModal } from "@/components/AppMessageModal";
+import type { MessageVariant } from "@/components/AppMessageModal";
+import { OverlayPreloader } from "@/components/OverlayPreloader";
 
 export default function AdminTestQuestionsPage() {
   const router = useRouter();
@@ -19,11 +23,28 @@ export default function AdminTestQuestionsPage() {
   const [optD, setOptD] = useState("");
   const [correct, setCorrect] = useState("");
   const [loading, setLoading] = useState(false);
+  const [questionsLoading, setQuestionsLoading] = useState(true);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalTitle, setModalTitle] = useState("");
+  const [modalMessage, setModalMessage] = useState("");
+  const [modalVariant, setModalVariant] = useState<MessageVariant>("info");
 
-  const load = async () => {
+  const showModal = useCallback(
+    (title: string, message: string, variant: MessageVariant) => {
+      setModalTitle(title);
+      setModalMessage(message);
+      setModalVariant(variant);
+      setModalOpen(true);
+    },
+    [],
+  );
+
+  const load = useCallback(async () => {
     const rows = await api(`/tests/${testId}/with-answers`);
     setQuestions(rows);
-  };
+  }, [testId]);
 
   useEffect(() => {
     if (localStorage.getItem("role") !== "admin") {
@@ -36,18 +57,22 @@ export default function AdminTestQuestionsPage() {
   useEffect(() => {
     if (!authorized || !testId) return;
     (async () => {
+      setQuestionsLoading(true);
       try {
         await load();
       } catch {
         setQuestions([]);
+        showModal("Questions", "Could not load questions for this test.", "error");
+      } finally {
+        setQuestionsLoading(false);
       }
     })();
-  }, [authorized, testId]);
+  }, [authorized, testId, load, showModal]);
 
   if (!authorized) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-950 text-white">
-        <p>Checking access...</p>
+        <OverlayPreloader open label="Checking access…" />
       </div>
     );
   }
@@ -62,11 +87,15 @@ export default function AdminTestQuestionsPage() {
   const addQuestion = async () => {
     const options = optionsFromFields();
     if (!question.trim() || options.length < 2) {
-      alert("Enter the question and at least two options.");
+      showModal("Add question", "Enter the question and at least two options.", "error");
       return;
     }
     if (!correct.trim() || !options.includes(correct.trim())) {
-      alert("Correct answer must exactly match one of the options.");
+      showModal(
+        "Add question",
+        "Correct answer must exactly match one of the options.",
+        "error",
+      );
       return;
     }
     try {
@@ -87,25 +116,60 @@ export default function AdminTestQuestionsPage() {
       setOptD("");
       setCorrect("");
       await load();
+      showModal("Add question", "Question saved.", "success");
     } catch (e: any) {
-      alert(e.message);
+      showModal("Add question", e.message || "Could not save question.", "error");
     } finally {
       setLoading(false);
     }
   };
 
-  const remove = async (id: number) => {
-    if (!confirm("Delete this question?")) return;
+  const confirmDelete = async () => {
+    if (deleteId == null) return;
     try {
-      await api(`/questions/${id}`, { method: "DELETE" });
+      setDeleteLoading(true);
+      await api(`/questions/${deleteId}`, { method: "DELETE" });
       await load();
+      setDeleteId(null);
     } catch (e: any) {
-      alert(e.message);
+      showModal("Delete question", e.message || "Could not delete.", "error");
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
   return (
     <div className="min-h-screen bg-slate-950 px-4 py-10 text-white">
+      <OverlayPreloader
+        open={questionsLoading || loading || deleteLoading}
+        label={
+          questionsLoading
+            ? "Loading questions…"
+            : deleteLoading
+              ? "Deleting…"
+              : loading
+                ? "Saving…"
+                : undefined
+        }
+      />
+      <AppMessageModal
+        open={modalOpen}
+        title={modalTitle}
+        message={modalMessage}
+        variant={modalVariant}
+        onClose={() => setModalOpen(false)}
+      />
+      <AppConfirmModal
+        open={deleteId !== null}
+        title="Delete question"
+        message="Delete this question? This cannot be undone."
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        danger
+        loading={deleteLoading}
+        onCancel={() => !deleteLoading && setDeleteId(null)}
+        onConfirm={confirmDelete}
+      />
       <div className="mx-auto max-w-3xl space-y-8">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <h1 className="text-2xl font-bold">Questions — test {testId}</h1>
@@ -189,7 +253,7 @@ export default function AdminTestQuestionsPage() {
                   </p>
                   <button
                     type="button"
-                    onClick={() => remove(q.id)}
+                    onClick={() => setDeleteId(q.id)}
                     className="text-sm text-red-400 hover:underline"
                   >
                     Delete

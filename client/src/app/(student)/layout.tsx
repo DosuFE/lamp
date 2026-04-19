@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api } from "@/app/services/api";
+import { AppMessageModal } from "@/components/AppMessageModal";
+import { OverlayPreloader } from "@/components/OverlayPreloader";
 
 export default function StudentLayout({
   children,
@@ -14,9 +16,12 @@ export default function StudentLayout({
 
   const [role, setRole] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [lectureHintOpen, setLectureHintOpen] = useState(false);
 
   useEffect(() => {
     const fetchUser = async () => {
+      setProfileLoading(true);
       try {
         const user = await api("/auth/profile");
         setRole(user.role);
@@ -27,14 +32,24 @@ export default function StudentLayout({
         }
       } catch {
         router.replace("/dashboard");
+      } finally {
+        setProfileLoading(false);
       }
     };
 
-    fetchUser();
-  }, []);
+    void fetchUser();
+  }, [router]);
 
   return (
     <div className="flex h-screen bg-slate-950">
+      <OverlayPreloader open={profileLoading} label="Loading your profile…" />
+      <AppMessageModal
+        open={lectureHintOpen}
+        title="Lectures"
+        message="Open a course from Courses and use “View Lectures”, or pick a course first so we know which lectures to open."
+        variant="info"
+        onClose={() => setLectureHintOpen(false)}
+      />
       {/* SIDEBAR */}
       <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 text-white p-4 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 ${
         sidebarOpen ? 'translate-x-0' : '-translate-x-full'
@@ -63,7 +78,7 @@ export default function StudentLayout({
               const courseId = localStorage.getItem("courseId");
 
               if (!courseId) {
-                alert("Please select a course first");
+                setLectureHintOpen(true);
                 return;
               }
 

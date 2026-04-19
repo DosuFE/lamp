@@ -3,26 +3,45 @@
 import { useEffect, useState } from "react";
 import { api } from "@/app/services/api";
 import { useParams } from "next/navigation";
+import { AppMessageModal } from "@/components/AppMessageModal";
+import { OverlayPreloader } from "@/components/OverlayPreloader";
 
 export default function LecturesPage() {
   const { courseId } = useParams();
   const [lectures, setLectures] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [errorOpen, setErrorOpen] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   const fetchLectures = async () => {
+    setLoading(true);
     try {
       const res = await api(`/lectures/course/${courseId}`);
       setLectures(res);
     } catch (err: any) {
-      alert("Access denied or no lectures");
+      setErrorMessage(
+        err.message || "Access was denied or lectures could not be loaded.",
+      );
+      setErrorOpen(true);
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (courseId) fetchLectures();
+    if (courseId) void fetchLectures();
   }, [courseId]);
 
   return (
     <div className="min-h-screen bg-slate-950 px-4 py-10">
+      <OverlayPreloader open={loading} label="Loading lectures…" />
+      <AppMessageModal
+        open={errorOpen}
+        title="Lectures"
+        message={errorMessage}
+        variant="error"
+        onClose={() => setErrorOpen(false)}
+      />
       <div className="mx-auto max-w-6xl">
         <div className="mb-8 text-center">
           <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">

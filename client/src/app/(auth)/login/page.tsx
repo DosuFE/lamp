@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/app/services/api";
+import { AppMessageModal } from "@/components/AppMessageModal";
+import type { MessageVariant } from "@/components/AppMessageModal";
+import { OverlayPreloader } from "@/components/OverlayPreloader";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -10,6 +13,9 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalMessage, setModalMessage] = useState("");
+  const [modalVariant, setModalVariant] = useState<MessageVariant>("error");
 
   const login = async () => {
     try {
@@ -41,7 +47,9 @@ export default function LoginPage() {
       router.replace("/dashboard");
     } catch (err: any) {
       console.error("LOGIN ERROR:", err.message);
-      alert(err.message); // show REAL error
+      setModalMessage(err.message || "Login failed.");
+      setModalVariant("error");
+      setModalOpen(true);
     } finally {
       setLoading(false);
     }
@@ -49,6 +57,14 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-950 px-4 py-10">
+      <OverlayPreloader open={loading} label="Signing you in…" />
+      <AppMessageModal
+        open={modalOpen}
+        title="Login"
+        message={modalMessage}
+        variant={modalVariant}
+        onClose={() => setModalOpen(false)}
+      />
       <div className="relative w-full max-w-md overflow-hidden rounded-[2rem] border border-white/10 bg-slate-900/85 px-6 py-8 shadow-[0_35px_120px_rgba(99,102,241,0.28)] backdrop-blur-xl sm:px-10 sm:py-10">
         <div className="absolute -left-10 top-0 h-24 w-24 rounded-full bg-violet-500/20 blur-3xl" />
         <div className="absolute -right-10 bottom-8 h-24 w-24 rounded-full bg-fuchsia-500/20 blur-3xl" />
