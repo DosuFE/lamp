@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -9,14 +10,15 @@ import { Course } from '../entities/course.entity';
 import { Enrollment } from '../entities/enrollment.entity';
 import { Lecture } from '../entities/lecture.entity';
 
-type CreateLectureDto = {
+type CreateLectureInput = {
   courseId: number;
   title: string;
-  content: string;
+  content?: string;
+  videoUrl?: string;
   date: Date;
 };
 
-type UpdateLectureDto = Partial<CreateLectureDto>;
+type UpdateLectureDto = Partial<CreateLectureInput>;
 
 @Injectable()
 export class LecturesService {
@@ -31,7 +33,16 @@ export class LecturesService {
     private enrollmentRepo: Repository<Enrollment>,
   ) {}
 
-  async create(dto: CreateLectureDto) {
+  async create(dto: CreateLectureInput) {
+    const content = dto.content?.trim() || null;
+    const videoUrl = dto.videoUrl?.trim() || null;
+
+    if (!content && !videoUrl) {
+      throw new BadRequestException(
+        'Add lecture notes, a video link, or both.',
+      );
+    }
+
     const course = await this.courseRepo.findOne({
       where: { id: dto.courseId },
     });
@@ -41,8 +52,9 @@ export class LecturesService {
     }
 
     const lecture = this.lectureRepo.create({
-      title: dto.title,
-      content: dto.content,
+      title: dto.title.trim(),
+      content,
+      videoUrl,
       date: dto.date,
       course,
     });
@@ -98,8 +110,19 @@ export class LecturesService {
     }
 
     if (dto.title !== undefined) lecture.title = dto.title;
-    if (dto.content !== undefined) lecture.content = dto.content;
+    if (dto.content !== undefined) {
+      lecture.content = dto.content?.trim() || null;
+    }
+    if (dto.videoUrl !== undefined) {
+      lecture.videoUrl = dto.videoUrl?.trim() || null;
+    }
     if (dto.date !== undefined) lecture.date = dto.date;
+
+    if (!lecture.content?.trim() && !lecture.videoUrl?.trim()) {
+      throw new BadRequestException(
+        'Lecture must keep at least notes or a video link.',
+      );
+    }
 
     return this.lectureRepo.save(lecture);
   }

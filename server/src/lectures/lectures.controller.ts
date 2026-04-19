@@ -9,8 +9,11 @@ import {
   Post,
   Request,
   UseGuards,
+  UsePipes,
+  ValidationPipe,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { CreateLectureDto } from './dto/create-lecture.dto';
 import { LecturesService } from './lectures.service';
 
 @Controller('lectures')
@@ -19,12 +22,25 @@ export class LecturesController {
 
   @UseGuards(AuthGuard('jwt'))
   @Post()
-  create(@Body() dto: any, @Request() req) {
+  @UsePipes(
+    new ValidationPipe({
+      transform: true,
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    }),
+  )
+  create(@Body() dto: CreateLectureDto, @Request() req) {
     if (req.user.role !== 'admin') {
       throw new ForbiddenException('Only admin can create lecture');
     }
 
-    return this.lectureService.create(dto);
+    return this.lectureService.create({
+      courseId: dto.courseId,
+      title: dto.title,
+      content: dto.content,
+      videoUrl: dto.videoUrl,
+      date: new Date(dto.date),
+    });
   }
 
   @UseGuards(AuthGuard('jwt'))
@@ -33,8 +49,13 @@ export class LecturesController {
     return this.lectureService.findByCourse(+courseId, req.user.userId);
   }
 
+  @UseGuards(AuthGuard('jwt'))
   @Get()
-  findAll() {
+  findAll(@Request() req) {
+    if (req.user.role !== 'admin') {
+      throw new ForbiddenException('Only admin can list all lectures');
+    }
+
     return this.lectureService.findAll();
   }
 

@@ -1,11 +1,15 @@
 import type { NextConfig } from "next";
 
+const backendBase = (
+  process.env.BACKEND_PROXY_URL ?? "https://lamp-toz7.onrender.com"
+).replace(/\/$/, "");
+
 const nextConfig: NextConfig = {
   async rewrites() {
     return [
       {
         source: "/api/:path*",
-        destination: "http://localhost:5051/:path*",
+        destination: `${backendBase}/:path*`,
       },
     ];
   },

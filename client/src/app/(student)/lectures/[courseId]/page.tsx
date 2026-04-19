@@ -6,6 +6,28 @@ import { useParams } from "next/navigation";
 import { AppMessageModal } from "@/components/AppMessageModal";
 import { OverlayPreloader } from "@/components/OverlayPreloader";
 
+function youtubeEmbedUrl(url: string): string | null {
+  try {
+    const u = new URL(url.trim());
+    if (u.hostname === "youtu.be" && u.pathname.length > 1) {
+      return `https://www.youtube.com/embed/${u.pathname.slice(1).split("/")[0]}`;
+    }
+    if (
+      u.hostname.includes("youtube.com") &&
+      u.pathname.startsWith("/embed/")
+    ) {
+      return url.trim();
+    }
+    if (u.hostname.includes("youtube.com")) {
+      const id = u.searchParams.get("v");
+      if (id) return `https://www.youtube.com/embed/${id}`;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
 export default function LecturesPage() {
   const { courseId } = useParams();
   const [lectures, setLectures] = useState([]);
@@ -58,7 +80,10 @@ export default function LecturesPage() {
           </div>
         ) : (
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {lectures.map((lec: any) => (
+            {lectures.map((lec: any) => {
+              const ytEmbed =
+                lec.videoUrl && youtubeEmbedUrl(lec.videoUrl);
+              return (
               <div
                 key={lec.id}
                 className="relative overflow-hidden rounded-2xl border border-white/10 bg-slate-900/50 p-6 shadow-[0_20px_60px_rgba(99,102,241,0.15)] backdrop-blur-sm transition duration-200 hover:scale-[1.02] hover:shadow-[0_25px_80px_rgba(99,102,241,0.25)]"
@@ -68,22 +93,30 @@ export default function LecturesPage() {
                   {lec.title}
                 </h2>
 
-                {lec.videoUrl && (
-                  <video
-                    controls
-                    className="w-full rounded-lg mb-4"
-                  >
-                    <source src={lec.videoUrl} />
-                  </video>
-                )}
+                {lec.videoUrl ? (
+                  ytEmbed ? (
+                    <iframe
+                      title={lec.title}
+                      src={ytEmbed}
+                      className="mb-4 aspect-video w-full rounded-lg border-0"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                      allowFullScreen
+                    />
+                  ) : (
+                    <video controls className="mb-4 w-full rounded-lg">
+                      <source src={lec.videoUrl} />
+                    </video>
+                  )
+                ) : null}
 
-                {lec.content && (
-                  <p className="text-sm text-slate-400 leading-relaxed">
+                {lec.content ? (
+                  <p className="text-sm leading-relaxed text-slate-400 whitespace-pre-wrap">
                     {lec.content}
                   </p>
-                )}
+                ) : null}
               </div>
-            ))}
+            );
+            })}
           </div>
         )}
       </div>

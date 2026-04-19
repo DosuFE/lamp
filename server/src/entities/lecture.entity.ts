@@ -9,8 +9,11 @@ export class Lecture {
   @Column()
   title: string;
 
-  @Column()
-  content: string;
+  @Column({ type: 'text', nullable: true })
+  content: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  videoUrl: string | null;
 
   @ManyToOne(() => Course, (course) => course.lectures)
   course: Course;
