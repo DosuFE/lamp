@@ -41,7 +41,7 @@ export default function LecturesPage() {
     fetchLectures();
   }, [courseId]);
 
-  // 🔄 LOADING UI
+  //  LOADING UI
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-950 text-white">
