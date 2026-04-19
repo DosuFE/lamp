@@ -27,7 +27,7 @@ export default function Courses() {
 
       setCourses(allCourses);
 
-      const ids = enrolled.map((e: any) => e.course.id);
+      const ids: number[] = enrolled.map((e: any) => e.course.id);
       setMyCourses(ids);
     } catch (err: any) {
       console.error(err);
@@ -48,7 +48,7 @@ export default function Courses() {
         method: "POST",
       });
 
-      setMyCourses((prev) => [...prev, courseId]);
+      setMyCourses((prev) => prev.includes(courseId) ? prev : [...prev, courseId]);
       setModalTitle("Enrolled");
       setModalMessage("You are now enrolled in this course.");
       setModalVariant("success");
