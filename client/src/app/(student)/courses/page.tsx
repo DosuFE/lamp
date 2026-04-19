@@ -8,8 +8,8 @@ import type { MessageVariant } from "@/components/AppMessageModal";
 import { OverlayPreloader } from "@/components/OverlayPreloader";
 
 export default function Courses() {
-  const [courses, setCourses] = useState([]);
-  const [myCourses, setMyCourses] = useState([]);
+  const [courses, setCourses] = useState<any[]>([]);
+  const [myCourses, setMyCourses] = useState<number[]>([]);
   const [loadingId, setLoadingId] = useState<number | null>(null);
   const [pageLoading, setPageLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
