@@ -17,14 +17,18 @@ import { LecturesModule } from './lectures/lectures.module';
 import { TestsModule } from './tests/tests.module';
 import { QuestionsModule } from './questions/questions.module';
 import { ResultsModule } from './results/results.module';
+import { ConfigModule } from '@nestjs/config';
 
 @Module({
   imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+    }),
     UsersModule,
     TypeOrmModule.forRoot({
       type: 'postgres',
-      url: 'postgresql://neondb_owner:npg_AphDsu7mIli4@ep-fragrant-glitter-anaoi02w-pooler.c-6.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require',
-      synchronize: true,
+      url: process.env.DATABASE_URL,
+      synchronize: process.env.NODE_ENV !== 'production',
       entities: [User, Course, Enrollment, Lecture, Test, Question, Result],
     }),
     AuthModule,

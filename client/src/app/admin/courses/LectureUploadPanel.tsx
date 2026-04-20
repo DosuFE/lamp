@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { api } from "@/app/services/api";
+import { api, uploadLecturePdf } from "@/app/services/api";
 import { AppMessageModal } from "@/components/AppMessageModal";
 import type { MessageVariant } from "@/components/AppMessageModal";
 import { AppConfirmModal } from "@/components/AppConfirmModal";
@@ -17,6 +17,8 @@ type LectureRow = {
   title: string;
   content?: string | null;
   videoUrl?: string | null;
+  pdfUrl?: string | null;
+  pdfFileName?: string | null;
   date: string;
   course: { id: number; title: string };
 };
@@ -34,6 +36,10 @@ export function LectureUploadPanel({ courses }: { courses: Course[] }) {
   const [scheduledAt, setScheduledAt] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
   const [notes, setNotes] = useState("");
+  const [pdfFromServer, setPdfFromServer] = useState("");
+  const [pdfExternalUrl, setPdfExternalUrl] = useState("");
+  const [pdfFileName, setPdfFileName] = useState("");
+  const [pdfUploading, setPdfUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [listLoading, setListLoading] = useState(false);
   const [allLectures, setAllLectures] = useState<LectureRow[]>([]);
@@ -88,29 +94,33 @@ export function LectureUploadPanel({ courses }: { courses: Course[] }) {
     setScheduledAt("");
     setVideoUrl("");
     setNotes("");
+    setPdfFromServer("");
+    setPdfExternalUrl("");
+    setPdfFileName("");
   };
 
-  const onNotesFile = async (file: File | null) => {
+  const onPdfFile = async (file: File | null) => {
     if (!file) return;
     const lower = file.name.toLowerCase();
-    if (!lower.endsWith(".txt") && !lower.endsWith(".md")) {
-      openModal(
-        "Use a .txt or .md file for imported notes.",
-        "error",
-        "Import notes",
-      );
+    if (!lower.endsWith(".pdf")) {
+      openModal("Only PDF files are allowed.", "error", "PDF");
       return;
     }
     try {
-      const text = await file.text();
-      setNotes(text);
+      setPdfUploading(true);
+      const res = await uploadLecturePdf(file);
+      setPdfFromServer(res.pdfUrl);
+      setPdfExternalUrl("");
+      setPdfFileName(res.pdfFileName);
       openModal(
-        `Imported “${file.name}” into the notes field.`,
+        `Uploaded “${res.pdfFileName}”. Students will use Download PDF on the lecture.`,
         "success",
-        "Import notes",
+        "PDF",
       );
-    } catch {
-      openModal("Could not read that file.", "error", "Import notes");
+    } catch (err: any) {
+      openModal(err.message || "PDF upload failed.", "error", "PDF");
+    } finally {
+      setPdfUploading(false);
     }
   };
 
@@ -129,9 +139,11 @@ export function LectureUploadPanel({ courses }: { courses: Course[] }) {
     }
     const trimmedNotes = notes.trim();
     const trimmedVideo = videoUrl.trim();
-    if (!trimmedNotes && !trimmedVideo) {
+    const trimmedPdf = (pdfFromServer.trim() || pdfExternalUrl.trim());
+    const trimmedPdfName = pdfFileName.trim();
+    if (!trimmedNotes && !trimmedVideo && !trimmedPdf) {
       openModal(
-        "Add notes, a video URL, or both so students have something to open.",
+        "Add notes, a video URL, or a PDF so students have something to use.",
         "error",
         "Publish lecture",
       );
@@ -147,6 +159,8 @@ export function LectureUploadPanel({ courses }: { courses: Course[] }) {
           title: title.trim(),
           content: trimmedNotes || undefined,
           videoUrl: trimmedVideo || undefined,
+          pdfUrl: trimmedPdf || undefined,
+          pdfFileName: trimmedPdfName || undefined,
           date: new Date(scheduledAt).toISOString(),
         }),
       });
@@ -219,8 +233,8 @@ export function LectureUploadPanel({ courses }: { courses: Course[] }) {
             Lectures
           </h2>
           <p className="mt-1 max-w-xl text-sm text-slate-400">
-            Publish material for a course: optional video link (YouTube or
-            direct .mp4), typed or imported notes, and a scheduled date.
+            Add a video link (YouTube, Vimeo, or a direct file), typed notes,
+            and/or a PDF students can download.
           </p>
         </div>
       </div>
@@ -281,31 +295,92 @@ export function LectureUploadPanel({ courses }: { courses: Course[] }) {
               type="url"
               value={videoUrl}
               onChange={(e) => setVideoUrl(e.target.value)}
-              placeholder="https://… (YouTube or direct video file)"
+              placeholder="YouTube, Vimeo, or direct .mp4 / .webm link"
               className="w-full rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-3 text-white placeholder:text-slate-500 outline-none transition focus:border-violet-500 focus:ring-1 focus:ring-violet-500/40"
             />
           </div>
 
           <div>
-            <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
-              <label className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                Notes / script
-              </label>
-              <label className="cursor-pointer text-xs font-medium text-violet-400 hover:text-violet-300">
+            <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">
+              PDF for students (optional)
+            </label>
+            <p className="mb-2 text-xs text-slate-500">
+              Upload a PDF to this server, or paste a public HTTPS link to a PDF
+              hosted elsewhere.
+            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <label
+                className={`cursor-pointer rounded-lg border border-slate-600 bg-slate-800 px-4 py-2 text-sm font-medium text-violet-300 transition hover:border-violet-500 hover:text-white ${pdfUploading ? "pointer-events-none opacity-50" : ""}`}
+              >
                 <input
                   type="file"
-                  accept=".txt,.md,text/plain,text/markdown"
+                  accept=".pdf,application/pdf"
                   className="sr-only"
-                  onChange={(e) => void onNotesFile(e.target.files?.[0] ?? null)}
+                  disabled={pdfUploading}
+                  onChange={(e) => void onPdfFile(e.target.files?.[0] ?? null)}
                 />
-                Import .txt / .md
+                {pdfUploading ? "Uploading PDF…" : "Upload PDF"}
               </label>
+              {pdfFromServer ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPdfFromServer("");
+                    setPdfFileName("");
+                  }}
+                  className="text-xs text-slate-400 underline hover:text-white"
+                >
+                  Clear uploaded PDF
+                </button>
+              ) : null}
             </div>
+            <input
+              type="url"
+              value={pdfExternalUrl}
+              onChange={(e) => {
+                const v = e.target.value;
+                setPdfExternalUrl(v);
+                const t = v.trim();
+                if (t && !pdfFileName.trim()) {
+                  try {
+                    const name = decodeURIComponent(
+                      new URL(t).pathname.split("/").pop() || "",
+                    );
+                    if (name.toLowerCase().endsWith(".pdf")) {
+                      setPdfFileName(name);
+                    }
+                  } catch {
+                    /* ignore */
+                  }
+                }
+              }}
+              placeholder="Or paste PDF URL (https://…)"
+              className="mt-3 w-full rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-3 text-white placeholder:text-slate-500 outline-none transition focus:border-violet-500 focus:ring-1 focus:ring-violet-500/40"
+            />
+            {pdfFromServer ? (
+              <p className="mt-2 text-xs text-emerald-400/90">
+                Using uploaded file. Filename for download:{" "}
+                <span className="text-white">{pdfFileName || "document.pdf"}</span>
+              </p>
+            ) : null}
+            <input
+              type="text"
+              value={pdfFileName}
+              onChange={(e) => setPdfFileName(e.target.value)}
+              placeholder="Download name (e.g. Week4-slides.pdf)"
+              className="mt-2 w-full rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-2.5 text-sm text-white placeholder:text-slate-500 outline-none transition focus:border-violet-500 focus:ring-1 focus:ring-violet-500/40"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">
+              Notes (optional)
+            </label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Outline, reading, or transcript…"
-              rows={8}
+              rows={6}
               className="w-full resize-y rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-3 text-sm leading-relaxed text-white placeholder:text-slate-500 outline-none transition focus:border-violet-500 focus:ring-1 focus:ring-violet-500/40"
             />
           </div>
@@ -313,7 +388,7 @@ export function LectureUploadPanel({ courses }: { courses: Course[] }) {
           <button
             type="button"
             onClick={() => void publishLecture()}
-            disabled={submitting || listLoading}
+            disabled={submitting || listLoading || pdfUploading}
             className="w-full rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-900/30 transition hover:from-emerald-500 hover:to-teal-500 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {submitting ? "Publishing…" : "Publish lecture"}
@@ -377,6 +452,11 @@ export function LectureUploadPanel({ courses }: { courses: Course[] }) {
                         {lec.content ? (
                           <span className="rounded bg-slate-700/80 px-2 py-0.5">
                             Notes
+                          </span>
+                        ) : null}
+                        {lec.pdfUrl ? (
+                          <span className="rounded bg-slate-700/80 px-2 py-0.5">
+                            PDF
                           </span>
                         ) : null}
                       </p>

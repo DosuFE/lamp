@@ -3,6 +3,10 @@
 import { useEffect, useState } from "react";
 import { api } from "@/app/services/api";
 import { useParams, useRouter } from "next/navigation";
+import {
+  LecturePdfDownload,
+  LectureVideoPlayer,
+} from "@/components/LectureAssets";
 
 export default function LecturesPage() {
   const { id } = useParams();
@@ -38,27 +42,26 @@ export default function LecturesPage() {
       }
     };
 
-    fetchLectures();
+    void fetchLectures();
   }, [courseId]);
 
-  //  LOADING UI
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950 text-white">
+      <div className="flex min-h-screen items-center justify-center bg-slate-950 text-white">
         <p>Loading lectures...</p>
       </div>
     );
   }
 
-  // ❌ ERROR UI
   if (error) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-950 text-white">
+      <div className="flex min-h-screen flex-col items-center justify-center bg-slate-950 text-white">
         <p className="mb-4 text-red-400">{error}</p>
 
         <button
+          type="button"
           onClick={() => router.push("/courses")}
-          className="bg-purple-600 px-4 py-2 rounded"
+          className="rounded bg-purple-600 px-4 py-2"
         >
           Go to Courses
         </button>
@@ -66,11 +69,10 @@ export default function LecturesPage() {
     );
   }
 
-  // ⚠️ EMPTY STATE
   if (lectures.length === 0) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-950 text-white">
-        <h2 className="text-xl font-semibold mb-2">No Lectures Yet</h2>
+      <div className="flex min-h-screen flex-col items-center justify-center bg-slate-950 text-white">
+        <h2 className="mb-2 text-xl font-semibold">No Lectures Yet</h2>
         <p className="text-gray-400">
           Lectures for this course have not been uploaded.
         </p>
@@ -78,29 +80,34 @@ export default function LecturesPage() {
     );
   }
 
-  // ✅ SUCCESS UI
   return (
     <div className="min-h-screen bg-slate-950 p-6 text-white">
-      <h1 className="text-2xl font-bold mb-6">Course Lectures</h1>
+      <h1 className="mb-6 text-2xl font-bold">Course Lectures</h1>
 
       <div className="grid gap-4">
         {lectures.map((lec: any) => (
           <div
             key={lec.id}
-            className="bg-slate-900 p-4 rounded-lg border border-white/10"
+            className="rounded-lg border border-white/10 bg-slate-900 p-4"
           >
             <h2 className="text-lg font-semibold">{lec.title}</h2>
-            <p className="text-sm text-gray-400 mb-2">
-              {lec.content || "No content"}
-            </p>
 
-            {lec.videoUrl && (
-              <video
-                src={lec.videoUrl}
-                controls
-                className="w-full mt-3 rounded"
+            {lec.videoUrl ? (
+              <LectureVideoPlayer videoUrl={lec.videoUrl} title={lec.title} />
+            ) : null}
+
+            {lec.pdfUrl ? (
+              <LecturePdfDownload
+                pdfUrl={lec.pdfUrl}
+                pdfFileName={lec.pdfFileName}
               />
-            )}
+            ) : null}
+
+            {lec.content ? (
+              <p className="mb-2 whitespace-pre-wrap text-sm text-gray-400">
+                {lec.content}
+              </p>
+            ) : null}
           </div>
         ))}
       </div>

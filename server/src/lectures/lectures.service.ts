@@ -15,6 +15,8 @@ type CreateLectureInput = {
   title: string;
   content?: string;
   videoUrl?: string;
+  pdfUrl?: string;
+  pdfFileName?: string;
   date: Date;
 };
 
@@ -36,10 +38,12 @@ export class LecturesService {
   async create(dto: CreateLectureInput) {
     const content = dto.content?.trim() || null;
     const videoUrl = dto.videoUrl?.trim() || null;
+    const pdfUrl = dto.pdfUrl?.trim() || null;
+    const pdfFileName = dto.pdfFileName?.trim() || null;
 
-    if (!content && !videoUrl) {
+    if (!content && !videoUrl && !pdfUrl) {
       throw new BadRequestException(
-        'Add lecture notes, a video link, or both.',
+        'Add lecture notes, a video link, a PDF, or any combination.',
       );
     }
 
@@ -55,6 +59,8 @@ export class LecturesService {
       title: dto.title.trim(),
       content,
       videoUrl,
+      pdfUrl,
+      pdfFileName,
       date: dto.date,
       course,
     });
@@ -116,11 +122,21 @@ export class LecturesService {
     if (dto.videoUrl !== undefined) {
       lecture.videoUrl = dto.videoUrl?.trim() || null;
     }
+    if (dto.pdfUrl !== undefined) {
+      lecture.pdfUrl = dto.pdfUrl?.trim() || null;
+    }
+    if (dto.pdfFileName !== undefined) {
+      lecture.pdfFileName = dto.pdfFileName?.trim() || null;
+    }
     if (dto.date !== undefined) lecture.date = dto.date;
 
-    if (!lecture.content?.trim() && !lecture.videoUrl?.trim()) {
+    if (
+      !lecture.content?.trim() &&
+      !lecture.videoUrl?.trim() &&
+      !lecture.pdfUrl?.trim()
+    ) {
       throw new BadRequestException(
-        'Lecture must keep at least notes or a video link.',
+        'Lecture must keep at least notes, a video link, or a PDF.',
       );
     }
 

@@ -15,6 +15,12 @@ export class Lecture {
   @Column({ type: 'text', nullable: true })
   videoUrl: string | null;
 
+  @Column({ type: 'text', nullable: true })
+  pdfUrl: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  pdfFileName: string | null;
+
   @ManyToOne(() => Course, (course) => course.lectures)
   course: Course;
 

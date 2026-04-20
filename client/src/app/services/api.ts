@@ -1,6 +1,10 @@
-const API_BASE = (
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://lamp-toz7.onrender.com"
-).replace(/\/$/, "");
+export function getApiBase() {
+  return (
+    process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://lamp-h3us.onrender.com"
+  ).replace(/\/$/, "");
+}
+
+const API_BASE = getApiBase();
 
 export const api = async (url: string, options: any = {}) => {
   const token = localStorage.getItem("token");
@@ -23,3 +27,21 @@ export const api = async (url: string, options: any = {}) => {
 
   return data;
 };
+
+export async function uploadLecturePdf(file: File) {
+  const token = localStorage.getItem("token");
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(`${API_BASE}/lectures/pdf-upload`, {
+    method: "POST",
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: form,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.message || "PDF upload failed");
+  }
+  return data as { pdfUrl: string; pdfFileName: string };
+}
