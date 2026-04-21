@@ -3,12 +3,14 @@ import {
   Body,
   Controller,
   Delete,
+  Header,
   ForbiddenException,
   Get,
   Param,
   Patch,
   Post,
   Request,
+  Res,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -17,16 +19,15 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AuthGuard } from '@nestjs/passport';
-import { diskStorage } from 'multer';
-import { existsSync, mkdirSync } from 'fs';
-import { join } from 'path';
-import { randomBytes } from 'crypto';
+import { memoryStorage } from 'multer';
+import type { Response } from 'express';
 import { CreateLectureDto } from './dto/create-lecture.dto';
 import { LecturesService } from './lectures.service';
 
 type UploadedPdfFile = {
-  filename: string;
   originalname: string;
+  mimetype: string;
+  buffer: Buffer;
 };
 
 @Controller('lectures')
@@ -52,14 +53,12 @@ export class LecturesController {
       title: dto.title,
       content: dto.content,
       videoUrl: dto.videoUrl,
-      pdfUrl: dto.pdfUrl,
-      pdfFileName: dto.pdfFileName,
       date: new Date(dto.date),
     });
   }
 
   @UseGuards(AuthGuard('jwt'))
-  @Post('pdf-upload')
+  @Post(':id/pdf')
   @UseInterceptors(
     FileInterceptor('file', {
       limits: { fileSize: 25 * 1024 * 1024 },
@@ -74,32 +73,55 @@ export class LecturesController {
         }
         cb(null, true);
       },
-      storage: diskStorage({
-        destination: (_req, _file, cb) => {
-          const dir = join(process.cwd(), 'uploads', 'pdfs');
-          if (!existsSync(dir)) {
-            mkdirSync(dir, { recursive: true });
-          }
-          cb(null, dir);
-        },
-        filename: (_req, file, cb) => {
-          const name = `${Date.now()}-${randomBytes(8).toString('hex')}.pdf`;
-          cb(null, name);
-        },
-      }),
+      storage: memoryStorage(),
     }),
   )
-  uploadPdf(@UploadedFile() file: UploadedPdfFile, @Request() req) {
+  uploadPdf(
+    @Param('id') id: string,
+    @UploadedFile() file: UploadedPdfFile,
+    @Request() req,
+  ) {
     if (req.user.role !== 'admin') {
       throw new ForbiddenException('Only admin can upload PDFs');
     }
     if (!file) {
       throw new BadRequestException('No file uploaded');
     }
-    return {
-      pdfUrl: `/files/pdfs/${file.filename}`,
-      pdfFileName: file.originalname || 'document.pdf',
-    };
+    return this.lectureService.setLecturePdf(+id, file);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Delete(':id/pdf')
+  clearPdf(@Param('id') id: string, @Request() req) {
+    if (req.user.role !== 'admin') {
+      throw new ForbiddenException('Only admin can clear PDFs');
+    }
+    return this.lectureService.clearLecturePdf(+id);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get(':id/pdf')
+  @Header('Cache-Control', 'private, max-age=0, must-revalidate')
+  async downloadPdf(
+    @Param('id') id: string,
+    @Request() req,
+    @Res() res: Response,
+  ) {
+    const pdf = await this.lectureService.getLecturePdfForUser(
+      +id,
+      req.user.userId,
+    );
+
+    const safeBase =
+      (pdf.title || 'lecture')
+        .replace(/[^\w\- ]+/g, '')
+        .trim()
+        .replace(/\s+/g, '-') || 'lecture';
+    const filename = `${safeBase}.pdf`;
+
+    res.setHeader('Content-Type', pdf.mimeType || 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    return res.send(pdf.data);
   }
 
   @UseGuards(AuthGuard('jwt'))

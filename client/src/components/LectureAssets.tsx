@@ -125,20 +125,15 @@ export function LectureVideoPlayer({
 }
 
 export function LecturePdfDownload({
-  pdfUrl,
-  pdfFileName,
+  lectureId,
 }: {
-  pdfUrl: string;
-  pdfFileName?: string | null;
+  lectureId: number;
 }) {
-  const href = resolvePublicAssetUrl(pdfUrl);
-  const raw = (pdfFileName && pdfFileName.trim()) || "lecture-material.pdf";
-  const downloadName = raw.toLowerCase().endsWith(".pdf") ? raw : `${raw}.pdf`;
+  const href = resolvePublicAssetUrl(`/lectures/${lectureId}/pdf`);
 
   return (
     <a
       href={href}
-      download={downloadName}
       target="_blank"
       rel="noopener noreferrer"
       className="mb-4 inline-flex items-center rounded-xl border border-red-500/40 bg-red-950/35 px-4 py-2.5 text-sm font-semibold text-red-100 transition hover:bg-red-900/45"

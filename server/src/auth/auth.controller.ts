@@ -5,6 +5,8 @@ import {
   Post,
   Request,
   UseGuards,
+  UsePipes,
+  ValidationPipe,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
@@ -22,8 +24,14 @@ export class AuthController {
   }
 
   @Post('register')
+  @UsePipes(
+    new ValidationPipe({
+      transform: true,
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    }),
+  )
   register(@Body() dto: RegisterDto) {
-    console.log('DTO received in Controller:', dto);
     return this.authService.register(dto);
   }
 

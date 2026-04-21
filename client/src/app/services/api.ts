@@ -28,11 +28,11 @@ export const api = async (url: string, options: any = {}) => {
   return data;
 };
 
-export async function uploadLecturePdf(file: File) {
+export async function uploadLecturePdf(file: File, lectureId: number) {
   const token = localStorage.getItem("token");
   const form = new FormData();
   form.append("file", file);
-  const res = await fetch(`${API_BASE}/lectures/pdf-upload`, {
+  const res = await fetch(`${API_BASE}/lectures/${lectureId}/pdf`, {
     method: "POST",
     headers: {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -43,5 +43,5 @@ export async function uploadLecturePdf(file: File) {
   if (!res.ok) {
     throw new Error(data.message || "PDF upload failed");
   }
-  return data as { pdfUrl: string; pdfFileName: string };
+  return data as { message: string };
 }

@@ -28,16 +28,6 @@ export class CreateLectureDto {
   @MaxLength(2000)
   videoUrl?: string;
 
-  @IsOptional()
-  @IsString()
-  @MaxLength(2000)
-  pdfUrl?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(255)
-  pdfFileName?: string;
-
   @IsDateString()
   date: string;
 }

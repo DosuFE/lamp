@@ -17,8 +17,6 @@ type LectureRow = {
   title: string;
   content?: string | null;
   videoUrl?: string | null;
-  pdfUrl?: string | null;
-  pdfFileName?: string | null;
   date: string;
   course: { id: number; title: string };
 };
@@ -36,9 +34,8 @@ export function LectureUploadPanel({ courses }: { courses: Course[] }) {
   const [scheduledAt, setScheduledAt] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
   const [notes, setNotes] = useState("");
-  const [pdfFromServer, setPdfFromServer] = useState("");
-  const [pdfExternalUrl, setPdfExternalUrl] = useState("");
-  const [pdfFileName, setPdfFileName] = useState("");
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [pdfSelectedName, setPdfSelectedName] = useState("");
   const [pdfUploading, setPdfUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [listLoading, setListLoading] = useState(false);
@@ -94,9 +91,8 @@ export function LectureUploadPanel({ courses }: { courses: Course[] }) {
     setScheduledAt("");
     setVideoUrl("");
     setNotes("");
-    setPdfFromServer("");
-    setPdfExternalUrl("");
-    setPdfFileName("");
+    setPdfFile(null);
+    setPdfSelectedName("");
   };
 
   const onPdfFile = async (file: File | null) => {
@@ -106,22 +102,8 @@ export function LectureUploadPanel({ courses }: { courses: Course[] }) {
       openModal("Only PDF files are allowed.", "error", "PDF");
       return;
     }
-    try {
-      setPdfUploading(true);
-      const res = await uploadLecturePdf(file);
-      setPdfFromServer(res.pdfUrl);
-      setPdfExternalUrl("");
-      setPdfFileName(res.pdfFileName);
-      openModal(
-        `Uploaded “${res.pdfFileName}”. Students will use Download PDF on the lecture.`,
-        "success",
-        "PDF",
-      );
-    } catch (err: any) {
-      openModal(err.message || "PDF upload failed.", "error", "PDF");
-    } finally {
-      setPdfUploading(false);
-    }
+    setPdfFile(file);
+    setPdfSelectedName(file.name);
   };
 
   const publishLecture = async () => {
@@ -139,11 +121,9 @@ export function LectureUploadPanel({ courses }: { courses: Course[] }) {
     }
     const trimmedNotes = notes.trim();
     const trimmedVideo = videoUrl.trim();
-    const trimmedPdf = (pdfFromServer.trim() || pdfExternalUrl.trim());
-    const trimmedPdfName = pdfFileName.trim();
-    if (!trimmedNotes && !trimmedVideo && !trimmedPdf) {
+    if (!trimmedNotes && !trimmedVideo && !pdfFile) {
       openModal(
-        "Add notes, a video URL, or a PDF so students have something to use.",
+        "Add notes, a video URL, or choose a PDF so students have something to use.",
         "error",
         "Publish lecture",
       );
@@ -152,24 +132,30 @@ export function LectureUploadPanel({ courses }: { courses: Course[] }) {
 
     try {
       setSubmitting(true);
-      await api("/lectures", {
+      const created = await api("/lectures", {
         method: "POST",
         body: JSON.stringify({
           courseId,
           title: title.trim(),
           content: trimmedNotes || undefined,
           videoUrl: trimmedVideo || undefined,
-          pdfUrl: trimmedPdf || undefined,
-          pdfFileName: trimmedPdfName || undefined,
           date: new Date(scheduledAt).toISOString(),
         }),
       });
+
+      const lectureId = Number(created?.id);
+      if (pdfFile && Number.isFinite(lectureId)) {
+        setPdfUploading(true);
+        await uploadLecturePdf(pdfFile, lectureId);
+      }
+
       openModal("Lecture published.", "success", "Publish lecture");
       resetForm();
       await loadLectures();
     } catch (err: any) {
       openModal(err.message || "Could not publish lecture.", "error", "Publish lecture");
     } finally {
+      setPdfUploading(false);
       setSubmitting(false);
     }
   };
@@ -305,8 +291,7 @@ export function LectureUploadPanel({ courses }: { courses: Course[] }) {
               PDF for students (optional)
             </label>
             <p className="mb-2 text-xs text-slate-500">
-              Upload a PDF to this server, or paste a public HTTPS link to a PDF
-              hosted elsewhere.
+              Choose a PDF now. It will be uploaded and stored in the database after you publish the lecture.
             </p>
             <div className="flex flex-wrap items-center gap-3">
               <label
@@ -321,12 +306,12 @@ export function LectureUploadPanel({ courses }: { courses: Course[] }) {
                 />
                 {pdfUploading ? "Uploading PDF…" : "Upload PDF"}
               </label>
-              {pdfFromServer ? (
+              {pdfFile ? (
                 <button
                   type="button"
                   onClick={() => {
-                    setPdfFromServer("");
-                    setPdfFileName("");
+                    setPdfFile(null);
+                    setPdfSelectedName("");
                   }}
                   className="text-xs text-slate-400 underline hover:text-white"
                 >
@@ -334,42 +319,11 @@ export function LectureUploadPanel({ courses }: { courses: Course[] }) {
                 </button>
               ) : null}
             </div>
-            <input
-              type="url"
-              value={pdfExternalUrl}
-              onChange={(e) => {
-                const v = e.target.value;
-                setPdfExternalUrl(v);
-                const t = v.trim();
-                if (t && !pdfFileName.trim()) {
-                  try {
-                    const name = decodeURIComponent(
-                      new URL(t).pathname.split("/").pop() || "",
-                    );
-                    if (name.toLowerCase().endsWith(".pdf")) {
-                      setPdfFileName(name);
-                    }
-                  } catch {
-                    /* ignore */
-                  }
-                }
-              }}
-              placeholder="Or paste PDF URL (https://…)"
-              className="mt-3 w-full rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-3 text-white placeholder:text-slate-500 outline-none transition focus:border-violet-500 focus:ring-1 focus:ring-violet-500/40"
-            />
-            {pdfFromServer ? (
+            {pdfSelectedName ? (
               <p className="mt-2 text-xs text-emerald-400/90">
-                Using uploaded file. Filename for download:{" "}
-                <span className="text-white">{pdfFileName || "document.pdf"}</span>
+                Selected: <span className="text-white">{pdfSelectedName}</span>
               </p>
             ) : null}
-            <input
-              type="text"
-              value={pdfFileName}
-              onChange={(e) => setPdfFileName(e.target.value)}
-              placeholder="Download name (e.g. Week4-slides.pdf)"
-              className="mt-2 w-full rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-2.5 text-sm text-white placeholder:text-slate-500 outline-none transition focus:border-violet-500 focus:ring-1 focus:ring-violet-500/40"
-            />
           </div>
 
           <div>
@@ -452,11 +406,6 @@ export function LectureUploadPanel({ courses }: { courses: Course[] }) {
                         {lec.content ? (
                           <span className="rounded bg-slate-700/80 px-2 py-0.5">
                             Notes
-                          </span>
-                        ) : null}
-                        {lec.pdfUrl ? (
-                          <span className="rounded bg-slate-700/80 px-2 py-0.5">
-                            PDF
                           </span>
                         ) : null}
                       </p>

@@ -15,8 +15,6 @@ type CreateLectureInput = {
   title: string;
   content?: string;
   videoUrl?: string;
-  pdfUrl?: string;
-  pdfFileName?: string;
   date: Date;
 };
 
@@ -38,12 +36,10 @@ export class LecturesService {
   async create(dto: CreateLectureInput) {
     const content = dto.content?.trim() || null;
     const videoUrl = dto.videoUrl?.trim() || null;
-    const pdfUrl = dto.pdfUrl?.trim() || null;
-    const pdfFileName = dto.pdfFileName?.trim() || null;
 
-    if (!content && !videoUrl && !pdfUrl) {
+    if (!content && !videoUrl) {
       throw new BadRequestException(
-        'Add lecture notes, a video link, a PDF, or any combination.',
+        'Add lecture notes and/or a video link. PDFs are uploaded after publishing.',
       );
     }
 
@@ -59,8 +55,9 @@ export class LecturesService {
       title: dto.title.trim(),
       content,
       videoUrl,
-      pdfUrl,
-      pdfFileName,
+      hasPdf: false,
+      pdfData: null,
+      pdfMimeType: null,
       date: dto.date,
       course,
     });
@@ -122,25 +119,90 @@ export class LecturesService {
     if (dto.videoUrl !== undefined) {
       lecture.videoUrl = dto.videoUrl?.trim() || null;
     }
-    if (dto.pdfUrl !== undefined) {
-      lecture.pdfUrl = dto.pdfUrl?.trim() || null;
-    }
-    if (dto.pdfFileName !== undefined) {
-      lecture.pdfFileName = dto.pdfFileName?.trim() || null;
-    }
     if (dto.date !== undefined) lecture.date = dto.date;
 
-    if (
-      !lecture.content?.trim() &&
-      !lecture.videoUrl?.trim() &&
-      !lecture.pdfUrl?.trim()
-    ) {
+    if (!lecture.content?.trim() && !lecture.videoUrl?.trim()) {
       throw new BadRequestException(
-        'Lecture must keep at least notes, a video link, or a PDF.',
+        'Lecture must keep at least notes and/or a video link.',
       );
     }
 
     return this.lectureRepo.save(lecture);
+  }
+
+  async setLecturePdf(
+    lectureId: number,
+    file: { buffer: Buffer; mimetype?: string },
+  ) {
+    const lecture = await this.lectureRepo.findOne({
+      where: { id: lectureId },
+    });
+
+    if (!lecture) {
+      throw new NotFoundException('Lecture not found');
+    }
+
+    lecture.pdfData = file.buffer;
+    lecture.pdfMimeType = file.mimetype || 'application/pdf';
+    lecture.hasPdf = true;
+
+    await this.lectureRepo.save(lecture);
+    return { message: 'PDF uploaded' };
+  }
+
+  async clearLecturePdf(lectureId: number) {
+    const lecture = await this.lectureRepo.findOne({
+      where: { id: lectureId },
+    });
+
+    if (!lecture) {
+      throw new NotFoundException('Lecture not found');
+    }
+
+    lecture.pdfData = null;
+    lecture.pdfMimeType = null;
+    lecture.hasPdf = false;
+    await this.lectureRepo.save(lecture);
+    return { message: 'PDF cleared' };
+  }
+
+  async getLecturePdfForUser(lectureId: number, userId: number) {
+    const lecture = await this.lectureRepo.findOne({
+      where: { id: lectureId },
+      relations: ['course'],
+    });
+
+    if (!lecture) {
+      throw new NotFoundException('Lecture not found');
+    }
+
+    const enrollment = await this.enrollmentRepo.findOne({
+      where: {
+        user: { id: userId },
+        course: { id: lecture.course.id },
+      },
+      relations: ['user', 'course'],
+    });
+
+    if (!enrollment) {
+      throw new ForbiddenException('You are not enrolled');
+    }
+
+    const withPdf = await this.lectureRepo
+      .createQueryBuilder('lecture')
+      .addSelect(['lecture.pdfData', 'lecture.pdfMimeType'])
+      .where('lecture.id = :id', { id: lectureId })
+      .getOne();
+
+    if (!withPdf?.pdfData) {
+      throw new NotFoundException('No PDF uploaded for this lecture');
+    }
+
+    return {
+      title: lecture.title,
+      mimeType: withPdf.pdfMimeType || 'application/pdf',
+      data: withPdf.pdfData,
+    };
   }
 
   async deleteLecture(lectureId: number) {

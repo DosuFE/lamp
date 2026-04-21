@@ -76,12 +76,7 @@ export default function LecturesPage() {
                   <LectureVideoPlayer videoUrl={lec.videoUrl} title={lec.title} />
                 ) : null}
 
-                {lec.pdfUrl ? (
-                  <LecturePdfDownload
-                    pdfUrl={lec.pdfUrl}
-                    pdfFileName={lec.pdfFileName}
-                  />
-                ) : null}
+                {lec.hasPdf ? <LecturePdfDownload lectureId={lec.id} /> : null}
 
                 {lec.content ? (
                   <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-400">
