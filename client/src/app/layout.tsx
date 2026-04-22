@@ -4,6 +4,9 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "LAMP",
   description: "Learning & Assessment Management Portal",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({
