@@ -17,7 +17,7 @@ import { LecturesModule } from './lectures/lectures.module';
 import { TestsModule } from './tests/tests.module';
 import { QuestionsModule } from './questions/questions.module';
 import { ResultsModule } from './results/results.module';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 
 @Module({
   imports: [
@@ -25,11 +25,30 @@ import { ConfigModule } from '@nestjs/config';
       isGlobal: true,
     }),
     UsersModule,
-    TypeOrmModule.forRoot({
-      type: 'postgres',
-      url: process.env.DATABASE_URL,
-      synchronize: process.env.NODE_ENV !== 'production',
-      entities: [User, Course, Enrollment, Lecture, Test, Question, Result],
+    TypeOrmModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => {
+        const databaseUrl = configService.get<string>('DATABASE_URL');
+        const isProduction = configService.get<string>('NODE_ENV') === 'production';
+
+        if (!databaseUrl) {
+          if (isProduction) {
+            throw new Error('DATABASE_URL is required in production');
+          }
+          throw new Error(
+            'DATABASE_URL is missing. Set it in your environment before starting the server.',
+          );
+        }
+
+        return {
+          type: 'postgres' as const,
+          url: databaseUrl,
+          synchronize: !isProduction,
+          entities: [User, Course, Enrollment, Lecture, Test, Question, Result],
+          // Render/Neon commonly require TLS for external Postgres connections.
+          ssl: isProduction ? { rejectUnauthorized: false } : false,
+        };
+      },
     }),
     AuthModule,
     CoursesModule,
