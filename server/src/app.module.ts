@@ -18,7 +18,6 @@ import { TestsModule } from './tests/tests.module';
 import { QuestionsModule } from './questions/questions.module';
 import { ResultsModule } from './results/results.module';
 import { ConfigModule } from '@nestjs/config';
-import { UploadModule } from './upload/upload.module';
 
 @Module({
   imports: [
@@ -39,7 +38,6 @@ import { UploadModule } from './upload/upload.module';
     TestsModule,
     QuestionsModule,
     ResultsModule,
-    UploadModule,
   ],
   controllers: [AppController],
   providers: [AppService],
