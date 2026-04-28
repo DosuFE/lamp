@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { api } from "@/app/services/api";
 import { useParams, useRouter } from "next/navigation";
 import {
-  LecturePdfDownload,
   LectureVideoPlayer,
 } from "@/components/LectureAssets";
 
@@ -96,13 +95,24 @@ export default function LecturesPage() {
               <LectureVideoPlayer videoUrl={lec.videoUrl} title={lec.title} />
             ) : null}
 
-            {lec.hasPdf ? <LecturePdfDownload lectureId={lec.id} /> : null}
+            {lec.pdfUrl ? (
+              <a
+                href={lec.pdfUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mb-4 inline-block text-sm font-semibold text-cyan-400 
+                underline-offset-2 hover:underline"
+              >
+                Download PDF
+              </a>
+            ) : null}
 
             {lec.content ? (
               <p className="mb-2 whitespace-pre-wrap text-sm text-gray-400">
                 {lec.content}
               </p>
             ) : null}
+
           </div>
         ))}
       </div>

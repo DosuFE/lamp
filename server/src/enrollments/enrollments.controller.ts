@@ -27,10 +27,7 @@ export class EnrollmentsController {
   }
 
   @Get('course/:courseId')
-  enrollmentForCourse(
-    @Param('courseId') courseId: string,
-    @Request() req,
-  ) {
+  enrollmentForCourse(@Param('courseId') courseId: string, @Request() req) {
     return this.enrollmentService.findMyEnrollmentByCourse(
       req.user.userId,
       +courseId,

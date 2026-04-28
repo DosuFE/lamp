@@ -5,10 +5,7 @@ import { api } from "@/app/services/api";
 import { useParams } from "next/navigation";
 import { AppMessageModal } from "@/components/AppMessageModal";
 import { OverlayPreloader } from "@/components/OverlayPreloader";
-import {
-  LecturePdfDownload,
-  LectureVideoPlayer,
-} from "@/components/LectureAssets";
+import { LectureVideoPlayer } from "@/components/LectureAssets";
 
 export default function LecturesPage() {
   const { courseId } = useParams();
@@ -76,7 +73,16 @@ export default function LecturesPage() {
                   <LectureVideoPlayer videoUrl={lec.videoUrl} title={lec.title} />
                 ) : null}
 
-                {lec.hasPdf ? <LecturePdfDownload lectureId={lec.id} /> : null}
+            {lec.pdfUrl ? (
+              <a
+                href={lec.pdfUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-2 inline-block text-sm font-semibold text-cyan-400 underline-offset-2 hover:underline"
+              >
+                Download PDF
+              </a>
+            ) : null}
 
                 {lec.content ? (
                   <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-400">

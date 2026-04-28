@@ -1,3 +1,11 @@
+// Utility to convert Google Drive share link to direct download link
+function convertDriveLink(url: string | undefined | null): string | null {
+  if (!url) return null;
+  const match = url.match(/\/d\/(.*?)(\/|$)/);
+  if (!match) return url;
+  const fileId = match[1];
+  return `https://drive.google.com/uc?export=download&id=${fileId}`;
+}
 import {
   BadRequestException,
   ForbiddenException,
@@ -9,16 +17,16 @@ import { Repository } from 'typeorm';
 import { Course } from '../entities/course.entity';
 import { Enrollment } from '../entities/enrollment.entity';
 import { Lecture } from '../entities/lecture.entity';
+import { UpdateLectureDto } from './dto/update-lecture.dto';
 
 type CreateLectureInput = {
   courseId: number;
   title: string;
   content?: string;
   videoUrl?: string;
+  pdfUrl?: string;
   date: Date;
 };
-
-type UpdateLectureDto = Partial<CreateLectureInput>;
 
 @Injectable()
 export class LecturesService {
@@ -36,10 +44,11 @@ export class LecturesService {
   async create(dto: CreateLectureInput) {
     const content = dto.content?.trim() || null;
     const videoUrl = dto.videoUrl?.trim() || null;
+    const pdfUrl = convertDriveLink(dto.pdfUrl?.trim() || null);
 
-    if (!content && !videoUrl) {
+    if (!content && !videoUrl && !pdfUrl) {
       throw new BadRequestException(
-        'Add lecture notes and/or a video link. PDFs are uploaded after publishing.',
+        'Add lecture notes, a video link, and/or a PDF link.',
       );
     }
 
@@ -55,9 +64,7 @@ export class LecturesService {
       title: dto.title.trim(),
       content,
       videoUrl,
-      hasPdf: false,
-      pdfData: null,
-      pdfMimeType: null,
+      pdfUrl,
       date: dto.date,
       course,
     });
@@ -119,90 +126,22 @@ export class LecturesService {
     if (dto.videoUrl !== undefined) {
       lecture.videoUrl = dto.videoUrl?.trim() || null;
     }
-    if (dto.date !== undefined) lecture.date = dto.date;
+    if (dto.pdfUrl !== undefined) {
+      lecture.pdfUrl = convertDriveLink(dto.pdfUrl?.trim() || null);
+    }
+    if (dto.date !== undefined) lecture.date = new Date(dto.date);
 
-    if (!lecture.content?.trim() && !lecture.videoUrl?.trim()) {
+    if (
+      !lecture.content?.trim() &&
+      !lecture.videoUrl?.trim() &&
+      !lecture.pdfUrl?.trim()
+    ) {
       throw new BadRequestException(
-        'Lecture must keep at least notes and/or a video link.',
+        'Lecture must keep at least notes, a video link, and/or a PDF link.',
       );
     }
 
     return this.lectureRepo.save(lecture);
-  }
-
-  async setLecturePdf(
-    lectureId: number,
-    file: { buffer: Buffer; mimetype?: string },
-  ) {
-    const lecture = await this.lectureRepo.findOne({
-      where: { id: lectureId },
-    });
-
-    if (!lecture) {
-      throw new NotFoundException('Lecture not found');
-    }
-
-    lecture.pdfData = file.buffer;
-    lecture.pdfMimeType = file.mimetype || 'application/pdf';
-    lecture.hasPdf = true;
-
-    await this.lectureRepo.save(lecture);
-    return { message: 'PDF uploaded' };
-  }
-
-  async clearLecturePdf(lectureId: number) {
-    const lecture = await this.lectureRepo.findOne({
-      where: { id: lectureId },
-    });
-
-    if (!lecture) {
-      throw new NotFoundException('Lecture not found');
-    }
-
-    lecture.pdfData = null;
-    lecture.pdfMimeType = null;
-    lecture.hasPdf = false;
-    await this.lectureRepo.save(lecture);
-    return { message: 'PDF cleared' };
-  }
-
-  async getLecturePdfForUser(lectureId: number, userId: number) {
-    const lecture = await this.lectureRepo.findOne({
-      where: { id: lectureId },
-      relations: ['course'],
-    });
-
-    if (!lecture) {
-      throw new NotFoundException('Lecture not found');
-    }
-
-    const enrollment = await this.enrollmentRepo.findOne({
-      where: {
-        user: { id: userId },
-        course: { id: lecture.course.id },
-      },
-      relations: ['user', 'course'],
-    });
-
-    if (!enrollment) {
-      throw new ForbiddenException('You are not enrolled');
-    }
-
-    const withPdf = await this.lectureRepo
-      .createQueryBuilder('lecture')
-      .addSelect(['lecture.pdfData', 'lecture.pdfMimeType'])
-      .where('lecture.id = :id', { id: lectureId })
-      .getOne();
-
-    if (!withPdf?.pdfData) {
-      throw new NotFoundException('No PDF uploaded for this lecture');
-    }
-
-    return {
-      title: lecture.title,
-      mimeType: withPdf.pdfMimeType || 'application/pdf',
-      data: withPdf.pdfData,
-    };
   }
 
   async deleteLecture(lectureId: number) {

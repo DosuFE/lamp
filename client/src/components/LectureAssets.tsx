@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { getApiBase } from "@/app/services/api";
 
 export function resolvePublicAssetUrl(url: string) {
@@ -121,24 +122,5 @@ export function LectureVideoPlayer({
         </a>
       )}
     </div>
-  );
-}
-
-export function LecturePdfDownload({
-  lectureId,
-}: {
-  lectureId: number;
-}) {
-  const href = resolvePublicAssetUrl(`/lectures/${lectureId}/pdf`);
-
-  return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="mb-4 inline-flex items-center rounded-xl border border-red-500/40 bg-red-950/35 px-4 py-2.5 text-sm font-semibold text-red-100 transition hover:bg-red-900/45"
-    >
-      Download PDF
-    </a>
   );
 }

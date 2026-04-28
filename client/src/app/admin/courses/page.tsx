@@ -116,6 +116,8 @@ export default function AdminCourses() {
     return <OverlayPreloader open label={blockingLabel} />;
   }
 
+  // PDF upload and handleCreateLecture removed; handled in LectureUploadPanel
+
   return (
     <div className="min-h-screen bg-slate-950 p-8 text-white">
       <OverlayPreloader open={blocking} label={blockingLabel} />
@@ -170,6 +172,8 @@ export default function AdminCourses() {
         </div>
 
         <LectureUploadPanel courses={courses} />
+
+        
 
         <div className="rounded-2xl bg-slate-900 p-8">
           <h2 className="mb-6 text-xl font-bold">All courses</h2>

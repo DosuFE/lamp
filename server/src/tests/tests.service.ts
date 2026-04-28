@@ -281,8 +281,7 @@ export class TestsService {
       return {
         message: 'Attempt in progress',
         startedAt: existing.startedAt,
-        timeLimitSeconds:
-          existing.timeLimitSeconds ?? test.duration * 60,
+        timeLimitSeconds: existing.timeLimitSeconds ?? test.duration * 60,
       };
     }
 

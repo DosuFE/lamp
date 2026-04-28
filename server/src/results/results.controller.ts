@@ -13,10 +13,7 @@ export class ResultsController {
   }
 
   @Get('course/:courseId')
-  myResultsForCourse(
-    @Param('courseId') courseId: string,
-    @Request() req,
-  ) {
+  myResultsForCourse(@Param('courseId') courseId: string, @Request() req) {
     return this.resultsService.findMyResultsByCourse(
       req.user.userId,
       +courseId,
@@ -25,9 +22,6 @@ export class ResultsController {
 
   @Get('test/:testId')
   myResultForTest(@Param('testId') testId: string, @Request() req) {
-    return this.resultsService.findMyResultByTest(
-      req.user.userId,
-      +testId,
-    );
+    return this.resultsService.findMyResultByTest(req.user.userId, +testId);
   }
 }

@@ -27,7 +27,7 @@ export class RegisterDto {
   @IsString()
   @IsNotEmpty({ message: 'Full name is required' })
   @MinLength(2)
-  @MaxLength(120)
+  @MaxLength(30, { message: 'Full name must not exceed 30 characters' })
   fullName: string;
 
   @IsString()
@@ -43,7 +43,7 @@ export class RegisterDto {
   @IsString()
   @IsNotEmpty({ message: 'Password is required' })
   @MinLength(8, { message: 'Password must be at least 8 characters' })
-  @MaxLength(128)
+  @MaxLength(20, { message: 'Password must not exceed 20 characters' })
   @Matches(/^(?=.*[A-Za-z])(?=.*\d).+$/, {
     message: 'Password must contain at least 1 letter and 1 number',
   })

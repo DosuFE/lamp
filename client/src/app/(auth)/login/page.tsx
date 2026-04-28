@@ -1,36 +1,47 @@
 "use client";
 
-import { useState } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 import { api } from "@/app/services/api";
 import { AppMessageModal } from "@/components/AppMessageModal";
 import type { MessageVariant } from "@/components/AppMessageModal";
 import { OverlayPreloader } from "@/components/OverlayPreloader";
 
+const loginSchema = z.object({
+  email: z.string().trim().email("Enter a valid email address."),
+  password: z.string().min(8, "Password must be at least 8 characters.").max(20, "Password must not exceed 20 characters."),
+});
+
+type LoginFormValues = z.infer<typeof loginSchema>;
+
+function getErrorMessage(err: unknown, fallback: string) {
+  if (err instanceof Error && err.message) return err.message;
+  return fallback;
+}
+
 export default function LoginPage() {
   const router = useRouter();
-
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
+  const { register, handleSubmit, formState: { errors } } = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { email: "", password: "" },
+  });
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMessage, setModalMessage] = useState("");
   const [modalVariant, setModalVariant] = useState<MessageVariant>("error");
 
-  const login = async () => {
-    try {
-      setLoading(true);
-
+  const loginMutation = useMutation({
+    mutationFn: async (values: LoginFormValues) => {
       const res = await api("/auth/login", {
         method: "POST",
         body: JSON.stringify({
-          email: email.trim(),
-          password: password.trim(),
+          email: values.email.trim(),
+          password: values.password.trim(),
         }),
       });
-
-      console.log("LOGIN SUCCESS:", res);
-
       localStorage.setItem("token", res.access_token);
 
       try {
@@ -45,19 +56,17 @@ export default function LoginPage() {
       }
 
       router.replace("/dashboard");
-    } catch (err: any) {
-      console.error("LOGIN ERROR:", err.message);
-      setModalMessage(err.message || "Login failed.");
+    },
+    onError: (err: unknown) => {
+      setModalMessage(getErrorMessage(err, "Login failed."));
       setModalVariant("error");
       setModalOpen(true);
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+  });
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-950 px-4 py-10">
-      <OverlayPreloader open={loading} label="Signing you in…" />
+      <OverlayPreloader open={loginMutation.isPending} label="Signing you in…" />
       <AppMessageModal
         open={modalOpen}
         title="Login"
@@ -73,27 +82,30 @@ export default function LoginPage() {
           Login
         </h2>
 
-        <div className="space-y-4">
+        <form className="space-y-4" onSubmit={handleSubmit((values) => loginMutation.mutate(values))}>
           <input
             placeholder="Email"
             className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder:text-slate-400 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] transition focus:border-cyan-400 focus:bg-white/15 focus:outline-none focus:ring-2 focus:ring-cyan-500/30"
-            onChange={(e) => setEmail(e.target.value)}
+            {...register("email")}
           />
+          {errors.email ? <p className="mt-1 text-xs text-red-300">{errors.email.message}</p> : null}
 
           <input
             type="password"
+            maxLength={20}
             placeholder="Password"
             className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder:text-slate-400 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] transition focus:border-cyan-400 focus:bg-white/15 focus:outline-none focus:ring-2 focus:ring-cyan-500/30"
-            onChange={(e) => setPassword(e.target.value)}
+            {...register("password")}
           />
-        </div>
+          {errors.password ? <p className="mt-1 text-xs text-red-300">{errors.password.message}</p> : null}
 
-        <button
-          onClick={login}
-          className="mt-8 w-full rounded-2xl bg-gradient-to-r from-cyan-500 to-violet-500 px-5 py-3 text-base font-semibold text-white shadow-[0_0_40px_rgba(59,130,246,0.35)] transition duration-200 hover:scale-[1.01] hover:shadow-[0_0_55px_rgba(59,130,246,0.45)] focus:outline-none focus:ring-4 focus:ring-cyan-400/30"
-        >
-          {loading ? "Signing In..." : "Sign In"}
-        </button>
+          <button
+            type="submit"
+            className="mt-8 w-full rounded-2xl bg-gradient-to-r from-cyan-500 to-violet-500 px-5 py-3 text-base font-semibold text-white shadow-[0_0_40px_rgba(59,130,246,0.35)] transition duration-200 hover:scale-[1.01] hover:shadow-[0_0_55px_rgba(59,130,246,0.45)] focus:outline-none focus:ring-4 focus:ring-cyan-400/30"
+          >
+            {loginMutation.isPending ? "Signing In..." : "Sign In"}
+          </button>
+        </form>
       </div>
     </div>
   );

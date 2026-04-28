@@ -4,6 +4,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  IsUrl,
   MaxLength,
   MinLength,
 } from 'class-validator';
@@ -25,8 +26,21 @@ export class CreateLectureDto {
 
   @IsOptional()
   @IsString()
+  @IsUrl(
+    { require_protocol: true },
+    { message: 'Video URL must be a valid URL with protocol' },
+  )
   @MaxLength(2000)
   videoUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsUrl(
+    { require_protocol: true },
+    { message: 'PDF URL must be a valid URL with protocol' },
+  )
+  @MaxLength(5000)
+  pdfUrl?: string;
 
   @IsDateString()
   date: string;

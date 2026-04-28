@@ -36,6 +36,13 @@ export class AuthController {
   }
 
   @Post('login')
+  @UsePipes(
+    new ValidationPipe({
+      transform: true,
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    }),
+  )
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
   }

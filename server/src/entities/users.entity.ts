@@ -2,12 +2,12 @@ import { Column, Entity, ManyToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { Course } from './course.entity';
 
 @Entity()
-export class User { 
+export class User {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column()
-  fullName: string;
+  @Column({ type: 'varchar', name: 'fullname', length: 30, nullable: true })
+  fullName: string | null;
 
   @Column({ unique: true })
   email: string;

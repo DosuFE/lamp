@@ -17,7 +17,8 @@ export class AuthService {
   ) {}
 
   async register(dto: RegisterDto) {
-    const existing = await this.usersService.findByEmail(dto.email);
+    const email = dto.email.trim().toLowerCase();
+    const existing = await this.usersService.findByEmail(email);
     if (existing) {
       throw new BadRequestException('Email is already in use');
     }
@@ -26,17 +27,28 @@ export class AuthService {
 
     const user = await this.usersService.create({
       ...dto,
+      email,
       password: hashedPassword,
     });
     return user;
   }
 
   async login(dto: LoginDto) {
-    const user = await this.usersService.findByEmail(dto.email);
+    const email = dto.email.trim().toLowerCase();
+    const user = await this.usersService.findByEmail(email);
 
     if (!user) throw new UnauthorizedException('Invalid credentials');
+    if (!user.password || typeof user.password !== 'string') {
+      throw new UnauthorizedException('Invalid credentials');
+    }
 
-    const isMatch = await bcrypt.compare(dto.password, user.password);
+    let isMatch = false;
+    try {
+      isMatch = await bcrypt.compare(dto.password, user.password);
+    } catch {
+      // Handles malformed legacy password hashes without leaking internals.
+      throw new UnauthorizedException('Invalid credentials');
+    }
 
     if (!isMatch) throw new UnauthorizedException('Invalid credentials');
 

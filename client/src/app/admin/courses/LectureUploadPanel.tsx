@@ -1,7 +1,9 @@
-"use client";
+ "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { api, uploadLecturePdf } from "@/app/services/api";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { z } from "zod";
+import { api } from "@/app/services/api";
 import { AppMessageModal } from "@/components/AppMessageModal";
 import type { MessageVariant } from "@/components/AppMessageModal";
 import { AppConfirmModal } from "@/components/AppConfirmModal";
@@ -17,6 +19,7 @@ type LectureRow = {
   title: string;
   content?: string | null;
   videoUrl?: string | null;
+  pdfUrl?: string | null;
   date: string;
   course: { id: number; title: string };
 };
@@ -28,18 +31,34 @@ type ModalState = {
   variant: MessageVariant;
 };
 
+const createLectureSchema = z
+  .object({
+    courseId: z.number().int().positive(),
+    title: z.string().trim().min(1, "Title is required.").max(500),
+    scheduledAt: z.string().min(1, "Schedule date and time is required."),
+    notes: z.string().trim().max(500000).optional(),
+    videoUrl: z.string().trim().url("Video URL must be valid.").max(2000).optional().or(z.literal("")),
+    pdfUrl: z.string().trim().url("PDF URL must be valid.").max(5000).optional().or(z.literal("")),
+  })
+  .refine((value) => value.notes || value.videoUrl || value.pdfUrl, {
+    message:
+      "Add notes, a video URL, or a Google Drive PDF link so students have something to use.",
+    path: ["notes"],
+  });
+
+function getErrorMessage(err: unknown, fallback: string) {
+  if (err instanceof Error && err.message) return err.message;
+  return fallback;
+}
+
 export function LectureUploadPanel({ courses }: { courses: Course[] }) {
   const [courseId, setCourseId] = useState<number | "">("");
   const [title, setTitle] = useState("");
   const [scheduledAt, setScheduledAt] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
+  const [pdfUrl, setPdfUrl] = useState("");
   const [notes, setNotes] = useState("");
-  const [pdfFile, setPdfFile] = useState<File | null>(null);
-  const [pdfSelectedName, setPdfSelectedName] = useState("");
-  const [pdfUploading, setPdfUploading] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [listLoading, setListLoading] = useState(false);
-  const [allLectures, setAllLectures] = useState<LectureRow[]>([]);
+  const queryClient = useQueryClient();
 
   const [modal, setModal] = useState<ModalState>({
     open: false,
@@ -62,25 +81,16 @@ export function LectureUploadPanel({ courses }: { courses: Course[] }) {
 
   const closeModal = () => setModal((m) => ({ ...m, open: false }));
 
-  const loadLectures = useCallback(async () => {
-    setListLoading(true);
-    try {
+  const lecturesQuery = useQuery({
+    queryKey: ["lectures", "admin"],
+    queryFn: async () => {
       const data = await api("/lectures");
-      setAllLectures(Array.isArray(data) ? data : []);
-    } catch (err: any) {
-      openModal(
-        err.message || "Could not load lectures.",
-        "error",
-        "Lectures",
-      );
-    } finally {
-      setListLoading(false);
-    }
-  }, []);
+      return Array.isArray(data) ? (data as LectureRow[]) : [];
+    },
+  });
 
-  useEffect(() => {
-    void loadLectures();
-  }, [loadLectures]);
+  const allLectures = lecturesQuery.data ?? [];
+  const listLoading = lecturesQuery.isLoading || lecturesQuery.isFetching;
 
   const lecturesForCourse = allLectures.filter(
     (l) => l.course?.id === courseId,
@@ -90,75 +100,54 @@ export function LectureUploadPanel({ courses }: { courses: Course[] }) {
     setTitle("");
     setScheduledAt("");
     setVideoUrl("");
+    setPdfUrl("");
     setNotes("");
-    setPdfFile(null);
-    setPdfSelectedName("");
-  };
-
-  const onPdfFile = async (file: File | null) => {
-    if (!file) return;
-    const lower = file.name.toLowerCase();
-    if (!lower.endsWith(".pdf")) {
-      openModal("Only PDF files are allowed.", "error", "PDF");
-      return;
-    }
-    setPdfFile(file);
-    setPdfSelectedName(file.name);
   };
 
   const publishLecture = async () => {
-    if (courseId === "") {
-      openModal("Choose a course first.", "error", "Publish lecture");
-      return;
-    }
-    if (!title.trim()) {
-      openModal("Title is required.", "error", "Publish lecture");
-      return;
-    }
-    if (!scheduledAt) {
-      openModal("Schedule date and time is required.", "error", "Publish lecture");
-      return;
-    }
-    const trimmedNotes = notes.trim();
-    const trimmedVideo = videoUrl.trim();
-    if (!trimmedNotes && !trimmedVideo && !pdfFile) {
-      openModal(
-        "Add notes, a video URL, or choose a PDF so students have something to use.",
-        "error",
-        "Publish lecture",
-      );
+    if (courseId === "") return openModal("Choose a course first.", "error", "Publish lecture");
+
+    const parsed = createLectureSchema.safeParse({
+      courseId,
+      title,
+      scheduledAt,
+      notes,
+      videoUrl,
+      pdfUrl,
+    });
+
+    if (!parsed.success) {
+      const firstMessage = parsed.error.issues[0]?.message ?? "Invalid lecture details.";
+      openModal(firstMessage, "error", "Publish lecture");
       return;
     }
 
+    const payload = parsed.data;
+
     try {
-      setSubmitting(true);
-      const created = await api("/lectures", {
+      await api("/lectures", {
         method: "POST",
         body: JSON.stringify({
-          courseId,
-          title: title.trim(),
-          content: trimmedNotes || undefined,
-          videoUrl: trimmedVideo || undefined,
-          date: new Date(scheduledAt).toISOString(),
+          courseId: payload.courseId,
+          title: payload.title.trim(),
+          content: payload.notes?.trim() || undefined,
+          videoUrl: payload.videoUrl?.trim() || undefined,
+          pdfUrl: payload.pdfUrl?.trim() || undefined,
+          date: new Date(payload.scheduledAt).toISOString(),
         }),
       });
 
-      const lectureId = Number(created?.id);
-      if (pdfFile && Number.isFinite(lectureId)) {
-        setPdfUploading(true);
-        await uploadLecturePdf(pdfFile, lectureId);
-      }
-
       openModal("Lecture published.", "success", "Publish lecture");
       resetForm();
-      await loadLectures();
-    } catch (err: any) {
-      openModal(err.message || "Could not publish lecture.", "error", "Publish lecture");
-    } finally {
-      setPdfUploading(false);
-      setSubmitting(false);
+      await queryClient.invalidateQueries({ queryKey: ["lectures", "admin"] });
+    } catch (err: unknown) {
+      openModal(getErrorMessage(err, "Could not publish lecture."), "error", "Publish lecture");
     }
   };
+
+  const publishMutation = useMutation({
+    mutationFn: publishLecture,
+  });
 
   const requestDelete = (row: LectureRow) => {
     setConfirmDelete({ open: true, id: row.id, title: row.title });
@@ -170,9 +159,9 @@ export function LectureUploadPanel({ courses }: { courses: Course[] }) {
       setDeleteLoading(true);
       await api(`/lectures/${confirmDelete.id}`, { method: "DELETE" });
       setConfirmDelete({ open: false, id: null, title: "" });
-      await loadLectures();
-    } catch (err: any) {
-      openModal(err.message || "Delete failed.", "error", "Delete lecture");
+      await queryClient.invalidateQueries({ queryKey: ["lectures", "admin"] });
+    } catch (err: unknown) {
+      openModal(getErrorMessage(err, "Delete failed."), "error", "Delete lecture");
     } finally {
       setDeleteLoading(false);
     }
@@ -220,7 +209,7 @@ export function LectureUploadPanel({ courses }: { courses: Course[] }) {
           </h2>
           <p className="mt-1 max-w-xl text-sm text-slate-400">
             Add a video link (YouTube, Vimeo, or a direct file), typed notes,
-            and/or a PDF students can download.
+            and/or a Google Drive PDF.
           </p>
         </div>
       </div>
@@ -288,42 +277,20 @@ export function LectureUploadPanel({ courses }: { courses: Course[] }) {
 
           <div>
             <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">
-              PDF for students (optional)
+              Google Drive PDF Link (optional)
             </label>
-            <p className="mb-2 text-xs text-slate-500">
-              Choose a PDF now. It will be uploaded and stored in the database after you publish the lecture.
+            <p className="mb-2 text-xs text-yellow-300">
+              Paste a Google Drive PDF link. <b>Set sharing to &quot;Anyone with the
+              link can view&quot;</b> in Google Drive, or students will get access
+              denied.
             </p>
-            <div className="flex flex-wrap items-center gap-3">
-              <label
-                className={`cursor-pointer rounded-lg border border-slate-600 bg-slate-800 px-4 py-2 text-sm font-medium text-violet-300 transition hover:border-violet-500 hover:text-white ${pdfUploading ? "pointer-events-none opacity-50" : ""}`}
-              >
-                <input
-                  type="file"
-                  accept=".pdf,application/pdf"
-                  className="sr-only"
-                  disabled={pdfUploading}
-                  onChange={(e) => void onPdfFile(e.target.files?.[0] ?? null)}
-                />
-                {pdfUploading ? "Uploading PDF…" : "Upload PDF"}
-              </label>
-              {pdfFile ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPdfFile(null);
-                    setPdfSelectedName("");
-                  }}
-                  className="text-xs text-slate-400 underline hover:text-white"
-                >
-                  Clear uploaded PDF
-                </button>
-              ) : null}
-            </div>
-            {pdfSelectedName ? (
-              <p className="mt-2 text-xs text-emerald-400/90">
-                Selected: <span className="text-white">{pdfSelectedName}</span>
-              </p>
-            ) : null}
+            <input
+              type="url"
+              value={pdfUrl}
+              onChange={(e) => setPdfUrl(e.target.value)}
+              placeholder="https://drive.google.com/file/d/.../view?usp=sharing"
+              className="w-full rounded-xl border border-slate-600 bg-slate-800/80 px-4 py-3 text-white placeholder:text-slate-500 outline-none transition focus:border-violet-500 focus:ring-1 focus:ring-violet-500/40"
+            />
           </div>
 
           <div>
@@ -341,11 +308,11 @@ export function LectureUploadPanel({ courses }: { courses: Course[] }) {
 
           <button
             type="button"
-            onClick={() => void publishLecture()}
-            disabled={submitting || listLoading || pdfUploading}
+            onClick={() => publishMutation.mutate()}
+            disabled={publishMutation.isPending || listLoading}
             className="w-full rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-900/30 transition hover:from-emerald-500 hover:to-teal-500 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {submitting ? "Publishing…" : "Publish lecture"}
+            {publishMutation.isPending ? "Publishing…" : "Publish lecture"}
           </button>
         </div>
 
@@ -406,6 +373,11 @@ export function LectureUploadPanel({ courses }: { courses: Course[] }) {
                         {lec.content ? (
                           <span className="rounded bg-slate-700/80 px-2 py-0.5">
                             Notes
+                          </span>
+                        ) : null}
+                        {lec.pdfUrl ? (
+                          <span className="rounded bg-slate-700/80 px-2 py-0.5">
+                            PDF
                           </span>
                         ) : null}
                       </p>

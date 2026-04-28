@@ -1,7 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 import { api } from "@/app/services/api";
 import { AppMessageModal } from "@/components/AppMessageModal";
 import type { MessageVariant } from "@/components/AppMessageModal";
@@ -21,118 +25,96 @@ function isAllowedEmail(email: string) {
   return ALLOWED_EMAIL_DOMAINS.includes(domain);
 }
 
-function passwordMeetsPolicy(pw: string) {
-  const v = pw;
-  if (v.length < 8) return false;
-  if (!/[A-Za-z]/.test(v)) return false;
-  if (!/\d/.test(v)) return false;
-  return true;
+const registerSchema = z
+  .object({
+    fullName: z.string().trim().min(2, "Full name is required.").max(30, "Full name must not exceed 30 characters."),
+    email: z
+      .string()
+      .trim()
+      .email("Enter a valid email address.")
+      .refine((value) => isAllowedEmail(value), {
+        message: `Only ${ALLOWED_EMAIL_DOMAINS.join(", ")} emails are allowed.`,
+      }),
+    matricNo: z
+      .string()
+      .trim()
+      .min(1, "Matric number is required.")
+      .regex(/^\d+$/, "Matric number must be digits only."),
+    department: z.string().trim().min(2, "Department is required."),
+    password: z
+      .string()
+      .min(8, "Password must be 8+ characters.")
+      .max(20, "Password must not exceed 20 characters.")
+      .regex(/^(?=.*[A-Za-z])(?=.*\d).+$/, "Password must include at least 1 letter and 1 number."),
+    confirmPassword: z.string().min(1, "Confirm password is required."),
+  })
+  .refine((value) => value.password === value.confirmPassword, {
+    message: "Passwords do not match.",
+    path: ["confirmPassword"],
+  });
+
+type RegisterFormValues = z.infer<typeof registerSchema>;
+
+function getErrorMessage(err: unknown, fallback: string) {
+  if (err instanceof Error && err.message) return err.message;
+  return fallback;
 }
 
 export default function RegisterPage() {
   const router = useRouter();
-
-  const [form, setForm] = useState({
-    fullName: "",
-    email: "",
-    matricNo: "",
-    // faculty: "",
-    department: "",
-    password: "",
-    confirmPassword: "",
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<RegisterFormValues>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: {
+      fullName: "",
+      email: "",
+      matricNo: "",
+      department: "",
+      password: "",
+      confirmPassword: "",
+    },
   });
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [touched, setTouched] = useState<Record<string, boolean>>({});
-
-  const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalTitle, setModalTitle] = useState("");
   const [modalMessage, setModalMessage] = useState("");
   const [modalVariant, setModalVariant] = useState<MessageVariant>("info");
   const [postSuccessToLogin, setPostSuccessToLogin] = useState(false);
 
-  const errors = useMemo(() => {
-    const e: Record<string, string> = {};
-
-    if (!form.fullName.trim()) e.fullName = "Full name is required.";
-    if (!form.email.trim()) e.email = "Email is required.";
-    else if (!/^\S+@\S+\.\S+$/.test(normalizeEmail(form.email))) {
-      e.email = "Enter a valid email address.";
-    } else if (!isAllowedEmail(form.email)) {
-      e.email = `Only ${ALLOWED_EMAIL_DOMAINS.join(", ")} emails are allowed.`;
-    }
-
-    if (!form.matricNo.trim()) e.matricNo = "Matric number is required.";
-    else if (!/^\d+$/.test(form.matricNo.trim())) e.matricNo = "Matric number must be digits only.";
-
-    if (!form.department.trim()) e.department = "Department is required.";
-
-    if (!form.password) e.password = "Password is required.";
-    else if (!passwordMeetsPolicy(form.password)) {
-      e.password = "Password must be 8+ characters and include at least 1 letter and 1 number.";
-    }
-
-    if (!form.confirmPassword) e.confirmPassword = "Confirm password is required.";
-    else if (form.confirmPassword !== form.password) e.confirmPassword = "Passwords do not match.";
-
-    return e;
-  }, [form]);
-
-  const isValid = Object.keys(errors).length === 0;
-
-  const register = async () => {
-    try {
-      setTouched({
-        fullName: true,
-        email: true,
-        matricNo: true,
-        department: true,
-        password: true,
-        confirmPassword: true,
-      });
-
-      if (!isValid) {
-        setModalTitle("Fix your details");
-        setModalMessage("Please fill all required fields with valid details.");
-        setModalVariant("error");
-        setPostSuccessToLogin(false);
-        setModalOpen(true);
-        return;
-      }
-
-      setLoading(true);
+  const registerMutation = useMutation({
+    mutationFn: async (values: RegisterFormValues) => {
       const res = await api("/auth/register", {
         method: "POST",
         body: JSON.stringify({
-          fullName: form.fullName.trim(),
-          email: normalizeEmail(form.email),
-          password: form.password,
-          matricNo: Number(form.matricNo),
-          department: form.department.trim(),
-          role: "student",
+          fullName: values.fullName.trim(),
+          email: normalizeEmail(values.email),
+          password: values.password,
+          matricNo: Number(values.matricNo),
+          department: values.department.trim(),
         }),
       });
-
-      console.log("REGISTER SUCCESS:", res);
-
+      return res;
+    },
+    onSuccess: () => {
       setModalTitle("Account created");
       setModalMessage("Your account was created successfully. You can sign in now.");
       setModalVariant("success");
       setPostSuccessToLogin(true);
       setModalOpen(true);
-    } catch (err: any) {
-      console.error("REGISTER ERROR:", err);
+    },
+    onError: (err: unknown) => {
       setModalTitle("Registration failed");
-      setModalMessage(err.message || "Could not create account.");
+      setModalMessage(getErrorMessage(err, "Could not create account."));
       setModalVariant("error");
       setPostSuccessToLogin(false);
       setModalOpen(true);
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+  });
 
   const onCloseModal = () => {
     setModalOpen(false);
@@ -144,7 +126,7 @@ export default function RegisterPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 px-4 py-10">
-      <OverlayPreloader open={loading} label="Creating your account…" />
+      <OverlayPreloader open={registerMutation.isPending} label="Creating your account…" />
       <AppMessageModal
         open={modalOpen}
         title={modalTitle}
@@ -159,38 +141,35 @@ export default function RegisterPage() {
           Create Account
         </h2>
 
-        <div className="space-y-4">
+        <form className="space-y-4" onSubmit={handleSubmit((values) => registerMutation.mutate(values))}>
           <div>
             <input
               type="text"
-              value={form.fullName}
+              maxLength={30}
               placeholder="Full Name"
               className="w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-white 
               placeholder:text-slate-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition 
               focus:border-violet-400 focus:bg-white/20 focus:outline-none focus:ring-2 focus:ring-violet-500/30"
-              onChange={(e) => setForm({ ...form, fullName: e.target.value })}
-              onBlur={() => setTouched((t) => ({ ...t, fullName: true }))}
+              {...register("fullName")}
               required
             />
-            {touched.fullName && errors.fullName ? (
-              <p className="mt-1 text-xs text-red-300">{errors.fullName}</p>
+            {errors.fullName ? (
+              <p className="mt-1 text-xs text-red-300">{errors.fullName.message}</p>
             ) : null}
           </div>
 
           <div>
             <input
               type="email"
-              value={form.email}
               placeholder="Email (gmail/yahoo/outlook/hotmail only)"
               className="w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-white 
               placeholder:text-slate-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition 
               focus:border-violet-400 focus:bg-white/20 focus:outline-none focus:ring-2 focus:ring-violet-500/30"
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-              onBlur={() => setTouched((t) => ({ ...t, email: true }))}
+              {...register("email")}
               required
             />
-            {touched.email && errors.email ? (
-              <p className="mt-1 text-xs text-red-300">{errors.email}</p>
+            {errors.email ? (
+              <p className="mt-1 text-xs text-red-300">{errors.email.message}</p>
             ) : null}
           </div>
 
@@ -198,47 +177,42 @@ export default function RegisterPage() {
             <input
               type="text"
               inputMode="numeric"
-              value={form.matricNo}
               placeholder="Matric Number"
               className="w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-white 
               placeholder:text-slate-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition 
               focus:border-violet-400 focus:bg-white/20 focus:outline-none focus:ring-2 focus:ring-violet-500/30"
-              onChange={(e) => setForm({ ...form, matricNo: e.target.value })}
-              onBlur={() => setTouched((t) => ({ ...t, matricNo: true }))}
+              {...register("matricNo")}
               required
             />
-            {touched.matricNo && errors.matricNo ? (
-              <p className="mt-1 text-xs text-red-300">{errors.matricNo}</p>
+            {errors.matricNo ? (
+              <p className="mt-1 text-xs text-red-300">{errors.matricNo.message}</p>
             ) : null}
           </div>
 
           <div>
             <input
               type="text"
-              value={form.department}
               placeholder="Department (e.g Mathematics, Computer Science, Chemistry, etc)"
               className="w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-white 
               placeholder:text-slate-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition 
               focus:border-violet-400 focus:bg-white/20 focus:outline-none focus:ring-2 focus:ring-violet-500/30"
-              onChange={(e) => setForm({ ...form, department: e.target.value })}
-              onBlur={() => setTouched((t) => ({ ...t, department: true }))}
+              {...register("department")}
               required
             />
-            {touched.department && errors.department ? (
-              <p className="mt-1 text-xs text-red-300">{errors.department}</p>
+            {errors.department ? (
+              <p className="mt-1 text-xs text-red-300">{errors.department.message}</p>
             ) : null}
           </div>
 
           <div className="relative">
             <input
               type={showPassword ? "text" : "password"}
-              value={form.password}
+              maxLength={20}
               placeholder="Password (8+ chars, letter + number)"
               className="w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-3 pr-12 text-white 
               placeholder:text-slate-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition 
               focus:border-violet-400 focus:bg-white/20 focus:outline-none focus:ring-2 focus:ring-violet-500/30"
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
-              onBlur={() => setTouched((t) => ({ ...t, password: true }))}
+              {...register("password")}
               required
             />
             <button
@@ -287,21 +261,20 @@ export default function RegisterPage() {
                 </svg>
               )}
             </button>
-            {touched.password && errors.password ? (
-              <p className="mt-1 text-xs text-red-300">{errors.password}</p>
+            {errors.password ? (
+              <p className="mt-1 text-xs text-red-300">{errors.password.message}</p>
             ) : null}
           </div>
 
           <div className="relative">
             <input
               type={showConfirmPassword ? "text" : "password"}
-              value={form.confirmPassword}
+              maxLength={20}
               placeholder="Confirm Password"
               className="w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-3 pr-12 text-white 
               placeholder:text-slate-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition 
               focus:border-violet-400 focus:bg-white/20 focus:outline-none focus:ring-2 focus:ring-violet-500/30"
-              onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
-              onBlur={() => setTouched((t) => ({ ...t, confirmPassword: true }))}
+              {...register("confirmPassword")}
               required
             />
             <button
@@ -350,23 +323,21 @@ export default function RegisterPage() {
                 </svg>
               )}
             </button>
-            {touched.confirmPassword && errors.confirmPassword ? (
-              <p className="mt-1 text-xs text-red-300">{errors.confirmPassword}</p>
+            {errors.confirmPassword ? (
+              <p className="mt-1 text-xs text-red-300">{errors.confirmPassword.message}</p>
             ) : null}
           </div>
-        </div>
-
-        <button
-          type="button"
-          onClick={register}
-          disabled={loading}
-          className="mt-8 w-full rounded-2xl bg-gradient-to-r from-violet-500 to-fuchsia-500 px-5 
+          <button
+            type="submit"
+            disabled={registerMutation.isPending}
+            className="mt-8 w-full rounded-2xl bg-gradient-to-r from-violet-500 to-fuchsia-500 px-5 
           py-3 text-base font-semibold text-white shadow-[0_0_40px_rgba(168,85,247,0.35)] 
           transition duration-200 hover:scale-[1.01] hover:shadow-[0_0_55px_rgba(168,85,247,0.45)] 
           focus:outline-none focus:ring-4 focus:ring-violet-400/30 cursor-pointer disabled:opacity-50 disabled:hover:scale-100"
-        >
-          {loading ? "Creating account…" : "Create Account"}
-        </button>
+          >
+            {registerMutation.isPending ? "Creating account…" : "Create Account"}
+          </button>
+        </form>
       </div>
     </div>
   );
