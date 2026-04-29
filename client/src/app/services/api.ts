@@ -2,7 +2,6 @@ export function getApiBase() {
   const configuredBase = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
   if (configuredBase) return configuredBase.replace(/\/$/, "");
 
-  // Use local Nest API during local development to avoid hitting stale remote deployments.
   if (process.env.NODE_ENV !== "production") {
     return "http://localhost:5051";
   }

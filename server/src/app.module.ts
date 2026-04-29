@@ -40,13 +40,16 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
           );
         }
 
+        const isLocalDatabase =
+          databaseUrl.includes('localhost') || databaseUrl.includes('127.0.0.1');
+
         return {
           type: 'postgres' as const,
           url: databaseUrl,
           synchronize: !isProduction,
           entities: [User, Course, Enrollment, Lecture, Test, Question, Result],
-          // Render/Neon commonly require TLS for external Postgres connections.
-          ssl: isProduction ? { rejectUnauthorized: false } : false,
+          // Hosted Postgres providers (e.g. Neon/Render) require TLS.
+          ssl: isLocalDatabase ? false : { rejectUnauthorized: false },
         };
       },
     }),
