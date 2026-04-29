@@ -7,7 +7,7 @@ export function getApiBase() {
     return "http://localhost:5051";
   }
 
-  return "https://lamp-h3us.onrender.com";
+  return "https://lamp-2-9g92.onrender.com/";
 }
 
 const API_BASE = getApiBase();

@@ -22,7 +22,6 @@ function reportWebcam(testId: string, isOn: boolean) {
   });
 }
 
-/** Exam only starts after the browser returns a real fix (permission + device location on). */
 function ensureDeviceLocation(): Promise<void> {
   return new Promise((resolve, reject) => {
     if (typeof navigator === "undefined" || !navigator.geolocation) {

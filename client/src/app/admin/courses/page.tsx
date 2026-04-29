@@ -115,8 +115,7 @@ export default function AdminCourses() {
   if (!authorized) {
     return <OverlayPreloader open label={blockingLabel} />;
   }
-
-  // PDF upload and handleCreateLecture removed; handled in LectureUploadPanel
+l
 
   return (
     <div className="min-h-screen bg-slate-950 p-8 text-white">
