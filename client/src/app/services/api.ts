@@ -1,6 +1,6 @@
 export function getApiBase() {
   return (
-    process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://lamp-2-9g92.onrender.com"
+    process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://lamp-2-x9xg.onrender.com/"
   ).replace(/\/$/, "");
   // const configuredBase = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
   // if (configuredBase) return configuredBase.replace(/\/$/, "");
@@ -9,7 +9,7 @@ export function getApiBase() {
   //   return "http://localhost:5051";
   // }
 
-  return "https://lamp-2-9g92.onrender.com";
+  return "https://lamp-2-x9xg.onrender.com/";
 }
 
 const API_BASE = getApiBase();
