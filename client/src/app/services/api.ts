@@ -1,10 +1,13 @@
 export function getApiBase() {
-  const configuredBase = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
-  if (configuredBase) return configuredBase.replace(/\/$/, "");
+  return (
+    process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://lamp-2-9g92.onrender.com"
+  ).replace(/\/$/, "");
+  // const configuredBase = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
+  // if (configuredBase) return configuredBase.replace(/\/$/, "");
 
-  if (process.env.NODE_ENV !== "production") {
-    return "http://localhost:5051";
-  }
+  // if (process.env.NODE_ENV !== "production") {
+  //   return "http://localhost:5051";
+  // }
 
   return "https://lamp-2-9g92.onrender.com";
 }
@@ -49,7 +52,6 @@ export const api = async (url: string, options: ApiOptions = {}) => {
     ...(options.headers || {}),
   };
 
-  // Let the browser set multipart boundaries automatically.
   if (options.body instanceof FormData) {
     delete (mergedHeaders as Record<string, string>)["Content-Type"];
   }
