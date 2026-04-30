@@ -48,7 +48,6 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
           url: databaseUrl,
           synchronize: !isProduction,
           entities: [User, Course, Enrollment, Lecture, Test, Question, Result],
-          // Hosted Postgres providers (e.g. Neon/Render) require TLS.
           ssl: isLocalDatabase ? false : { rejectUnauthorized: false },
         };
       },
