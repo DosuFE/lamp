@@ -8,7 +8,7 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const allowedOrigins = (
     process.env.CORS_ORIGINS ||
-    'http://localhost:3000,https://lamp.vercel.app,https://lamp-2-9g92.onrender.com'
+    'http://localhost:3000,https://lamp.vercel.app,https://lamp-3-pfnr.onrender.com/'
   )
     .split(',')
     .map((origin) => origin.trim())

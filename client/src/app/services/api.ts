@@ -2,7 +2,7 @@
 
 export function getApiBase() {
   return (
-    process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://lamp-2-x9xg.onrender.com/"
+    process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://lamp-3-pfnr.onrender.com/"
   ).replace(/\/$/, "");
 }
 
