@@ -17,7 +17,7 @@ import { LecturesModule } from './lectures/lectures.module';
 import { TestsModule } from './tests/tests.module';
 import { QuestionsModule } from './questions/questions.module';
 import { ResultsModule } from './results/results.module';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ConfigModule } from '@nestjs/config';
 
 @Module({
   imports: [
@@ -25,34 +25,11 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
       isGlobal: true,
     }),
     UsersModule,
-    TypeOrmModule.forRootAsync({
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService) => {
-        const databaseUrl = configService.get<string>('DATABASE_URL');
-        const isProduction =
-          configService.get<string>('NODE_ENV') === 'production';
-
-        if (!databaseUrl) {
-          if (isProduction) {
-            throw new Error('DATABASE_URL is required in production');
-          }
-          throw new Error(
-            'DATABASE_URL is missing. Set it in your environment before starting the server.',
-          );
-        }
-
-        const isLocalDatabase =
-          databaseUrl.includes('localhost') ||
-          databaseUrl.includes('127.0.0.1');
-
-        return {
-          type: 'postgres' as const,
-          url: 'postgresql://neondb_owner:npg_AphDsu7mIli4@ep-fragrant-glitter-anaoi02w-pooler.c-6.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require',
-          synchronize: !isProduction,
-          entities: [User, Course, Enrollment, Lecture, Test, Question, Result],
-          ssl: isLocalDatabase ? false : { rejectUnauthorized: false },
-        };
-      },
+    TypeOrmModule.forRoot({
+      type: 'postgres',
+      url: process.env.DATABASE_URL,
+      synchronize: process.env.NODE_ENV !== 'production',
+      entities: [User, Course, Enrollment, Lecture, Test, Question, Result],
     }),
     AuthModule,
     CoursesModule,
