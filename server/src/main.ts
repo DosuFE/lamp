@@ -6,12 +6,13 @@ import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const normalizeOrigin = (value: string) => value.trim().replace(/\/+$/, '');
   const allowedOrigins = (
     process.env.CORS_ORIGINS ||
     'http://localhost:3000,https://lamp-chi-six.vercel.app/,https://lamp-3-pfnr.onrender.com/'
   )
     .split(',')
-    .map((origin) => origin.trim())
+    .map(normalizeOrigin)
     .filter(Boolean);
 
   app.useGlobalPipes(
@@ -23,7 +24,7 @@ async function bootstrap() {
   );
   app.enableCors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (!origin || allowedOrigins.includes(normalizeOrigin(origin))) {
         return callback(null, true);
       }
       return callback(new Error(`CORS blocked for origin: ${origin}`), false);
