@@ -44,11 +44,15 @@ Built with a scalable architecture using modern web technologies.
 
 # Frontend
 - Next.js (App Router)
+- TanStack Query
 - TypeScript
 - Tailwind CSS
 
 # Backend
 - NestJS
+- Pipes
+- Zod
+- Jwt Authentication
 - TypeORM
 
 # Database
