@@ -29,7 +29,8 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
         const databaseUrl = configService.get<string>('DATABASE_URL');
-        const isProduction = configService.get<string>('NODE_ENV') === 'production';
+        const isProduction =
+          configService.get<string>('NODE_ENV') === 'production';
 
         if (!databaseUrl) {
           if (isProduction) {
@@ -41,11 +42,12 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
         }
 
         const isLocalDatabase =
-          databaseUrl.includes('localhost') || databaseUrl.includes('127.0.0.1');
+          databaseUrl.includes('localhost') ||
+          databaseUrl.includes('127.0.0.1');
 
         return {
           type: 'postgres' as const,
-          url: databaseUrl,
+          url: 'postgresql://neondb_owner:npg_AphDsu7mIli4@ep-fragrant-glitter-anaoi02w-pooler.c-6.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require',
           synchronize: !isProduction,
           entities: [User, Course, Enrollment, Lecture, Test, Question, Result],
           ssl: isLocalDatabase ? false : { rejectUnauthorized: false },
