@@ -25,9 +25,13 @@ export default function Courses() {
       const allCourses = await api("/courses");
       const enrolled = await api("/enrollments/my-courses");
 
-      setCourses(allCourses);
+      setCourses(Array.isArray(allCourses) ? allCourses : []);
 
-      const ids: number[] = enrolled.map((e: any) => e.course.id);
+      const ids: number[] = Array.isArray(enrolled)
+        ? enrolled
+            .map((e: any) => e?.course?.id)
+            .filter((id): id is number => typeof id === "number")
+        : [];
       setMyCourses(ids);
     } catch (err: any) {
       console.error(err);

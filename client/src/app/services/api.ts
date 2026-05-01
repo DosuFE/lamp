@@ -35,7 +35,10 @@ function getToken() {
   return localStorage.getItem("token");
 }
 
-export const api = async (url: string, options: ApiOptions = {}) => {
+export const api = async <T = any>(
+  url: string,
+  options: ApiOptions = {},
+): Promise<T> => {
   const token = getToken();
   const path = url.startsWith("/") ? url : `/${url}`;
   const controller = new AbortController();
@@ -83,7 +86,7 @@ export const api = async (url: string, options: ApiOptions = {}) => {
     );
   }
 
-  return data;
+  return data as T;
 };
 
 export async function uploadLecturePdfToCloudinary(file: File) {

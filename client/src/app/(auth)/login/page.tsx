@@ -18,10 +18,6 @@ const loginSchema = z.object({
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
-type LoginResponse = {
-  access_token: string;
-};
-
 function getErrorMessage(err: unknown, fallback: string) {
   if (err instanceof Error && err.message) return err.message;
   return fallback;
@@ -39,18 +35,21 @@ export default function LoginPage() {
 
   const loginMutation = useMutation({
     mutationFn: async (values: LoginFormValues) => {
-      const res = (await api("/auth/login", {
+      const res = await api("/auth/login", {
         method: "POST",
         body: JSON.stringify({
           email: values.email.trim(),
           password: values.password.trim(),
         }),
-      })) as LoginResponse;
+      });
+      if (typeof res.access_token !== "string" || !res.access_token) {
+        throw new Error("Login failed.");
+      }
       localStorage.setItem("token", res.access_token);
 
       try {
         const profile = await api("/auth/profile");
-        if (profile?.role) {
+        if (typeof profile.role === "string" && profile.role) {
           localStorage.setItem("role", profile.role);
         } else {
           localStorage.removeItem("role");
