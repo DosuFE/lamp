@@ -4,17 +4,31 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "@/app/services/api";
 
+type ResultRow = {
+  id: number;
+  score: number;
+  totalQuestions: number;
+  percentage: number;
+  grade: string;
+  submittedAt?: string | null;
+  test?: {
+    title?: string | null;
+    course?: { title?: string | null } | null;
+  } | null;
+};
+
 export default function ResultsPage() {
-  const [rows, setRows] = useState<any[]>([]);
+  const [rows, setRows] = useState<ResultRow[]>([]);
   const [error, setError] = useState("");
 
   useEffect(() => {
     (async () => {
       try {
-        const data = await api("/results");
-        setRows(Array.isArray(data) ? data : []);
-      } catch (e: any) {
-        setError(e.message || "Could not load results.");
+        const data = await api<unknown>("/results");
+        setRows(Array.isArray(data) ? (data as ResultRow[]) : []);
+      } catch (e: unknown) {
+        const message = e instanceof Error ? e.message : "";
+        setError(message || "Could not load results.");
       }
     })();
   }, []);

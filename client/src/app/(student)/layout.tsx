@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { api } from "@/app/services/api";
+import { api, clearAuthStorage } from "@/app/services/api";
 import { AppMessageModal } from "@/components/AppMessageModal";
 import { OverlayPreloader } from "@/components/OverlayPreloader";
 
@@ -23,15 +23,27 @@ export default function StudentLayout({
     const fetchUser = async () => {
       setProfileLoading(true);
       try {
-        const user = await api("/auth/profile");
-        setRole(user.role);
-        if (user.role) {
+        const user = await api<{
+          role?: string;
+          hasFaceProfile?: boolean;
+          faceVerificationRequired?: boolean;
+        }>("/auth/profile");
+        setRole(typeof user.role === "string" ? user.role : null);
+        if (typeof user.role === "string" && user.role) {
           localStorage.setItem("role", user.role);
         } else {
           localStorage.removeItem("role");
         }
+
+        const hasFace = Boolean(user.hasFaceProfile);
+        const faceRequired = Boolean(user.faceVerificationRequired);
+        if (!hasFace || faceRequired) {
+          router.replace("/face-verification");
+          return;
+        }
       } catch {
-        router.replace("/dashboard");
+        clearAuthStorage();
+        router.replace("/login");
       } finally {
         setProfileLoading(false);
       }
@@ -141,10 +153,7 @@ export default function StudentLayout({
 
           <button
             onClick={() => {
-              localStorage.removeItem("token");
-              localStorage.removeItem("role");
-              localStorage.removeItem("courseId");
-
+              clearAuthStorage();
               router.replace("/login");
             }}
             className="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg transition"

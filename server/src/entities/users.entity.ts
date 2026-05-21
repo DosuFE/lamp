@@ -23,4 +23,19 @@ export class User {
 
   @Column({ default: 'student' })
   role: 'student' | 'admin';
+
+  @Column({ type: 'text', nullable: true })
+  faceImageBase64: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  facePrint: string | null;
+
+  @Column({ type: 'boolean', default: true })
+  faceVerificationRequired: boolean;
+
+  @Column({ type: 'int', default: 0 })
+  faceVerificationFailedAttempts: number;
+
+  @Column({ type: 'int', default: 0 })
+  tokenVersion: number;
 }

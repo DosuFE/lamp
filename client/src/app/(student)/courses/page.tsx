@@ -7,8 +7,19 @@ import { AppMessageModal } from "@/components/AppMessageModal";
 import type { MessageVariant } from "@/components/AppMessageModal";
 import { OverlayPreloader } from "@/components/OverlayPreloader";
 
+type CourseRow = {
+  id: number;
+  title: string;
+  description?: string | null;
+};
+
+type EnrollmentRow = {
+  id: number;
+  course?: { id: number };
+};
+
 export default function Courses() {
-  const [courses, setCourses] = useState<any[]>([]);
+  const [courses, setCourses] = useState<CourseRow[]>([]);
   const [myCourses, setMyCourses] = useState<number[]>([]);
   const [loadingId, setLoadingId] = useState<number | null>(null);
   const [pageLoading, setPageLoading] = useState(true);
@@ -22,21 +33,22 @@ export default function Courses() {
   const fetchData = async () => {
     setPageLoading(true);
     try {
-      const allCourses = await api("/courses");
-      const enrolled = await api("/enrollments/my-courses");
+      const allCourses = await api<unknown>("/courses");
+      const enrolled = await api<unknown>("/enrollments/my-courses");
 
-      setCourses(Array.isArray(allCourses) ? allCourses : []);
+      setCourses(Array.isArray(allCourses) ? (allCourses as CourseRow[]) : []);
 
       const ids: number[] = Array.isArray(enrolled)
-        ? enrolled
-            .map((e: any) => e?.course?.id)
+        ? (enrolled as EnrollmentRow[])
+            .map((e) => e?.course?.id)
             .filter((id): id is number => typeof id === "number")
         : [];
       setMyCourses(ids);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
+      const message = err instanceof Error ? err.message : "";
       setModalTitle("Courses");
-      setModalMessage(err.message || "Could not load courses or enrollments.");
+      setModalMessage(message || "Could not load courses or enrollments.");
       setModalVariant("error");
       setModalOpen(true);
     } finally {
@@ -57,9 +69,10 @@ export default function Courses() {
       setModalMessage("You are now enrolled in this course.");
       setModalVariant("success");
       setModalOpen(true);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "";
       setModalTitle("Enrollment");
-      setModalMessage(err.message || "Could not enroll.");
+      setModalMessage(message || "Could not enroll.");
       setModalVariant("error");
       setModalOpen(true);
     } finally {
@@ -105,7 +118,7 @@ export default function Courses() {
           </div>
 
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {courses.map((c: any) => {
+            {courses.map((c) => {
               const isEnrolled = myCourses.includes(c.id);
 
               return (

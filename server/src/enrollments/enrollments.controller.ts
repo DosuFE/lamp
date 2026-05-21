@@ -8,8 +8,9 @@ import {
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { EnrollmentsService } from './enrollments.service';
+import { FaceVerifiedGuard } from 'src/auth/guards/face-verified.guard';
 
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'), FaceVerifiedGuard)
 @Controller('enrollments')
 export class EnrollmentsController {
   constructor(private readonly enrollmentService: EnrollmentsService) {}

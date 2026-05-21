@@ -7,10 +7,12 @@ import { Course } from '../entities/course.entity';
 import { Enrollment } from '../entities/enrollment.entity';
 import { Question } from '../entities/question.entity';
 import { Result } from '../entities/result.entity';
+import { AuthModule } from 'src/auth/auth.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Test, Course, Enrollment, Question, Result]),
+    AuthModule,
   ],
   providers: [TestsService],
   controllers: [TestsController],

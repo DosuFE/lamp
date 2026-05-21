@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { getApiBase } from "@/app/services/api";
 
 export function resolvePublicAssetUrl(url: string) {

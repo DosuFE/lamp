@@ -3,16 +3,21 @@
 import { useEffect, useState } from "react";
 import { api } from "@/app/services/api";
 
+type EnrollmentRow = {
+  id: number;
+  course: { id: number; title: string; description?: string | null };
+};
+
 export default function Dashboard() {
-  const [courses, setCourses] = useState([]);
+  const [courses, setCourses] = useState<EnrollmentRow[]>([]);
 
   useEffect(() => {
     const fetchCourses = async () => {
-      const res = await api("/enrollments/my-courses");
-      setCourses(res);
+      const res = await api<unknown>("/enrollments/my-courses");
+      setCourses(Array.isArray(res) ? (res as EnrollmentRow[]) : []);
     };
 
-    fetchCourses();
+    void fetchCourses();
   }, []);
 
   return (
@@ -33,7 +38,7 @@ export default function Dashboard() {
               <p>You have not enrolled in any courses yet.</p>
             </div>
           ) : (
-            courses.map((c: any) => (
+            courses.map((c) => (
               <div
                 key={c.id}
                 className="relative overflow-hidden rounded-2xl border border-white/10 bg-slate-900/50 p-6 shadow-[0_20px_60px_rgba(99,102,241,0.15)] backdrop-blur-sm transition duration-200 hover:scale-[1.02] hover:shadow-[0_25px_80px_rgba(99,102,241,0.25)]"

@@ -29,7 +29,8 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
         const databaseUrl = configService.get<string>('DATABASE_URL');
-        const isProduction = configService.get<string>('NODE_ENV') === 'production';
+        const isProduction =
+          configService.get<string>('NODE_ENV') === 'production';
 
         if (!databaseUrl) {
           if (isProduction) {
@@ -41,7 +42,8 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
         }
 
         const isLocalDatabase =
-          databaseUrl.includes('localhost') || databaseUrl.includes('127.0.0.1');
+          databaseUrl.includes('localhost') ||
+          databaseUrl.includes('127.0.0.1');
 
         return {
           type: 'postgres' as const,

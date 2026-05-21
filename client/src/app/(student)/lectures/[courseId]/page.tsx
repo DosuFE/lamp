@@ -1,37 +1,46 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "@/app/services/api";
 import { useParams } from "next/navigation";
 import { AppMessageModal } from "@/components/AppMessageModal";
 import { OverlayPreloader } from "@/components/OverlayPreloader";
 import { LectureVideoPlayer } from "@/components/LectureAssets";
 
+type LectureRow = {
+  id: number;
+  title: string;
+  content?: string | null;
+  videoUrl?: string | null;
+  pdfUrl?: string | null;
+};
+
 export default function LecturesPage() {
   const { courseId } = useParams();
-  const [lectures, setLectures] = useState([]);
+  const [lectures, setLectures] = useState<LectureRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorOpen, setErrorOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
-  const fetchLectures = async () => {
+  const fetchLectures = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api(`/lectures/course/${courseId}`);
-      setLectures(res);
-    } catch (err: any) {
+      const res = await api<unknown>(`/lectures/course/${courseId}`);
+      setLectures(Array.isArray(res) ? (res as LectureRow[]) : []);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "";
       setErrorMessage(
-        err.message || "Access was denied or lectures could not be loaded.",
+        message || "Access was denied or lectures could not be loaded.",
       );
       setErrorOpen(true);
     } finally {
       setLoading(false);
     }
-  };
+  }, [courseId]);
 
   useEffect(() => {
     if (courseId) void fetchLectures();
-  }, [courseId]);
+  }, [courseId, fetchLectures]);
 
   return (
     <div className="min-h-screen bg-slate-950 px-4 py-10">
@@ -59,7 +68,7 @@ export default function LecturesPage() {
           </div>
         ) : (
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {lectures.map((lec: any) => (
+            {lectures.map((lec) => (
               <div
                 key={lec.id}
                 className="relative overflow-hidden rounded-2xl border border-white/10 bg-slate-900/50 p-6 shadow-[0_20px_60px_rgba(99,102,241,0.15)] backdrop-blur-sm transition duration-200 hover:scale-[1.02] hover:shadow-[0_25px_80px_rgba(99,102,241,0.25)]"

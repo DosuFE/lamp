@@ -13,8 +13,9 @@ import { CoursesService } from './courses.service';
 import { CreateCourseDto } from 'src/auth/dto/createCourse.dto';
 import { RolesGuard } from 'src/auth/roles/roles.guard';
 import { Roles } from 'src/auth/decorators/roles.decorators';
+import { FaceVerifiedGuard } from 'src/auth/guards/face-verified.guard';
 
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'), FaceVerifiedGuard)
 @Controller('courses')
 export class CoursesController {
   constructor(private readonly courseService: CoursesService) {}

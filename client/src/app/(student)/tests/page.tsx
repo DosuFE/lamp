@@ -4,16 +4,27 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "@/app/services/api";
 
+type EnrolledCourseRow = {
+  id: number;
+  course: { id: number; title: string };
+};
+
+type TestRow = {
+  id: number;
+  title: string;
+  duration: number;
+};
+
 export default function StudentTestsPage() {
-  const [enrolled, setEnrolled] = useState<any[]>([]);
+  const [enrolled, setEnrolled] = useState<EnrolledCourseRow[]>([]);
   const [courseId, setCourseId] = useState("");
-  const [tests, setTests] = useState<any[]>([]);
+  const [tests, setTests] = useState<TestRow[]>([]);
 
   useEffect(() => {
     (async () => {
       try {
-        const rows = await api("/enrollments/my-courses");
-        setEnrolled(rows);
+        const rows = await api<unknown>("/enrollments/my-courses");
+        setEnrolled(Array.isArray(rows) ? (rows as EnrolledCourseRow[]) : []);
       } catch {
         setEnrolled([]);
       }
@@ -21,14 +32,11 @@ export default function StudentTestsPage() {
   }, []);
 
   useEffect(() => {
-    if (!courseId) {
-      setTests([]);
-      return;
-    }
+    if (!courseId) return;
     (async () => {
       try {
-        const rows = await api(`/tests/course/${courseId}`);
-        setTests(rows);
+        const rows = await api<unknown>(`/tests/course/${courseId}`);
+        setTests(Array.isArray(rows) ? (rows as TestRow[]) : []);
       } catch {
         setTests([]);
       }
@@ -51,7 +59,11 @@ export default function StudentTestsPage() {
           <label className="block text-sm text-slate-400 mb-2">Course</label>
           <select
             value={courseId}
-            onChange={(e) => setCourseId(e.target.value)}
+            onChange={(e) => {
+              const nextId = e.target.value;
+              setCourseId(nextId);
+              setTests([]);
+            }}
             className="w-full rounded-lg bg-slate-800 p-3 border border-white/10"
           >
             <option value="">Select course…</option>

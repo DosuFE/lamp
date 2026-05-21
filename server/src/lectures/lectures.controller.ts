@@ -17,12 +17,13 @@ import { AuthGuard } from '@nestjs/passport';
 import { CreateLectureDto } from './dto/create-lecture.dto';
 import { UpdateLectureDto } from './dto/update-lecture.dto';
 import { LecturesService } from './lectures.service';
+import { FaceVerifiedGuard } from 'src/auth/guards/face-verified.guard';
 
 @Controller('lectures')
 export class LecturesController {
   constructor(private readonly lectureService: LecturesService) {}
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), FaceVerifiedGuard)
   @Post()
   @UsePipes(
     new ValidationPipe({
@@ -46,7 +47,7 @@ export class LecturesController {
     });
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), FaceVerifiedGuard)
   @Get('course/:courseId')
   findByCourse(
     @Param('courseId', ParseIntPipe) courseId: number,
@@ -55,7 +56,7 @@ export class LecturesController {
     return this.lectureService.findByCourse(courseId, req.user.userId);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), FaceVerifiedGuard)
   @Get()
   findAll(@Request() req) {
     if (req.user.role !== 'admin') {
@@ -65,7 +66,7 @@ export class LecturesController {
     return this.lectureService.findAll();
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), FaceVerifiedGuard)
   @Patch(':id')
   @UsePipes(
     new ValidationPipe({
@@ -86,7 +87,7 @@ export class LecturesController {
     return this.lectureService.updateLecture(id, dto);
   }
 
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), FaceVerifiedGuard)
   @Delete(':id')
   deleteLecture(@Param('id', ParseIntPipe) id: number, @Request() req) {
     if (req.user.role !== 'admin') {

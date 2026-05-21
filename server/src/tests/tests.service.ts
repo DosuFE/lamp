@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Course } from '../entities/course.entity';
@@ -11,6 +12,8 @@ import { Question } from '../entities/question.entity';
 import { Result } from '../entities/result.entity';
 import { Test } from '../entities/test.entity';
 import { Repository } from 'typeorm';
+import { UsersService } from 'src/users/users.service';
+import { FaceVerificationService } from 'src/auth/face-verification.service';
 
 type CreateTestDto = {
   courseId: number;
@@ -46,6 +49,9 @@ export class TestsService {
 
     @InjectRepository(Result)
     private resultRepo: Repository<Result>,
+
+    private readonly usersService: UsersService,
+    private readonly faceVerificationService: FaceVerificationService,
   ) {}
 
   async create(dto: CreateTestDto) {
@@ -123,6 +129,18 @@ export class TestsService {
   }
 
   async getTestQuestionsForStudent(testId: number, userId: number) {
+    const blockedAttempt = await this.resultRepo.findOne({
+      where: {
+        user: { id: userId },
+        test: { id: testId },
+        faceBlocked: true,
+      },
+    });
+
+    if (blockedAttempt) {
+      throw new ForbiddenException('You are blocked from this test.');
+    }
+
     const test = await this.testRepo.findOne({
       where: { id: testId },
       relations: ['course'],
@@ -249,6 +267,18 @@ export class TestsService {
   }
 
   async startAttempt(userId: number, testId: number, dto: StartAttemptDto) {
+    const blockedAttempt = await this.resultRepo.findOne({
+      where: {
+        user: { id: userId },
+        test: { id: testId },
+        faceBlocked: true,
+      },
+    });
+
+    if (blockedAttempt) {
+      throw new ForbiddenException('You are blocked from this test.');
+    }
+
     const test = await this.testRepo.findOne({
       where: { id: testId },
       relations: ['course'],
@@ -343,6 +373,123 @@ export class TestsService {
     return {
       message: 'Webcam status recorded',
       webcamOffCount: attempt.webcamOffCount ?? 0,
+    };
+  }
+
+  async verifyLiveFaceDuringTest(
+    userId: number,
+    testId: number,
+    frames: string[],
+  ) {
+    const MAX_WARNINGS = 5;
+
+    const attempt = await this.findOrCreateAttempt(userId, testId);
+
+    if (attempt.isFinalized) {
+      throw new BadRequestException('This test has already been submitted');
+    }
+
+    if (attempt.faceBlocked) {
+      throw new UnauthorizedException({
+        message: 'You are blocked from this test.',
+        code: 'FACE_BLOCKED',
+      });
+    }
+
+    const user = await this.usersService.findById(userId);
+
+    if (!user) {
+      throw new UnauthorizedException('Invalid user');
+    }
+
+    if (!user.facePrint) {
+      throw new ForbiddenException({
+        message: 'VERIFY OR CAPTURE YOUR FACE FIRST.',
+        code: 'FACE_VERIFICATION_REQUIRED',
+      });
+    }
+
+    let matches = 0;
+
+    for (const frame of frames) {
+      const isMatch = await this.faceVerificationService.compare(
+        frame,
+        user.facePrint,
+      );
+
+      if (isMatch) {
+        matches++;
+      }
+    }
+
+    const passed = matches >= 2;
+
+    // FACE MATCHED
+    if (passed) {
+      attempt.faceMismatchCount = 0;
+
+      await this.resultRepo.save(attempt);
+
+      return {
+        ok: true,
+        warningCount: 0,
+        remainingWarnings: MAX_WARNINGS,
+      };
+    }
+
+    // FACE MISMATCH
+    attempt.faceMismatchCount = (attempt.faceMismatchCount ?? 0) + 1;
+
+    const remainingWarnings = MAX_WARNINGS - attempt.faceMismatchCount;
+
+    // Still allowed
+    if (attempt.faceMismatchCount < MAX_WARNINGS) {
+      await this.resultRepo.save(attempt);
+
+      return {
+        ok: false,
+        warning: true,
+        warningCount: attempt.faceMismatchCount,
+        remainingWarnings,
+        message: `Face mismatch detected. Warning ${attempt.faceMismatchCount} of ${MAX_WARNINGS}.`,
+        code: 'FACE_WARNING',
+      };
+    }
+
+    // FINAL BLOCK
+    attempt.faceBlocked = true;
+    attempt.malpracticeFlag = true;
+    attempt.evidenceImages = [...(attempt.evidenceImages || []), frames[0]];
+
+    await this.resultRepo.save(attempt);
+
+    await this.usersService.updateUser(userId, {
+      tokenVersion: (user.tokenVersion ?? 0) + 1,
+    });
+
+    throw new UnauthorizedException({
+      message: 'Face mismatch limit exceeded. You have been logged out.',
+      code: 'FACE_MISMATCH_LOGOUT',
+    });
+  }
+
+  private generateRandomChallenge() {
+    const challenges = ['LOOK_LEFT', 'LOOK_RIGHT', 'LOOK_UP', 'BLINK', 'SMILE'];
+
+    return challenges[Math.floor(Math.random() * challenges.length)];
+  }
+
+  async getFaceChallenge(userId: number, testId: number) {
+    const attempt = await this.findOrCreateAttempt(userId, testId);
+
+    const challenge = this.generateRandomChallenge();
+
+    attempt.currentFaceChallenge = challenge;
+
+    await this.resultRepo.save(attempt);
+
+    return {
+      challenge,
     };
   }
 

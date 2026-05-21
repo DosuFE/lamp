@@ -1,9 +1,9 @@
 
 
 export function getApiBase() {
-  return (
-    process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://lamp-3-pfnr.onrender.com/"
-  ).replace(/\/$/, "");
+  // Default to Next.js rewrite proxy (`/api/*` -> backend) so local dev works
+  // without configuring env vars.
+  return (process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api").replace(/\/$/, "");
 }
 
 const API_BASE = getApiBase();
@@ -12,7 +12,20 @@ const REQUEST_TIMEOUT_MS = 25000;
 
 type ApiOptions = RequestInit & {
   headers?: HeadersInit;
+  suppressAutoRedirect?: boolean;
 };
+
+export class ApiError extends Error {
+  status?: number;
+  code?: string;
+}
+
+export function clearAuthStorage() {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem("token");
+  localStorage.removeItem("role");
+  localStorage.removeItem("courseId");
+}
 
 function isAbortError(error: unknown): boolean {
   return (
@@ -35,10 +48,11 @@ function getToken() {
   return localStorage.getItem("token");
 }
 
-export const api = async <T = any>(
+export const api = async <T = unknown>(
   url: string,
   options: ApiOptions = {},
 ): Promise<T> => {
+  const suppressAutoRedirect = Boolean(options.suppressAutoRedirect);
   const token = getToken();
   const path = url.startsWith("/") ? url : `/${url}`;
   const controller = new AbortController();
@@ -80,10 +94,28 @@ export const api = async <T = any>(
 
   if (!res.ok) {
     console.error("API ERROR:", data);
-    throw new Error(
+    const error = new ApiError(
       (typeof data.message === "string" ? data.message : undefined) ||
         `Request failed with status ${res.status}${res.statusText ? ` (${res.statusText})` : ""}`,
     );
+    error.status = res.status;
+    if (typeof data.code === "string") {
+      error.code = data.code;
+    }
+
+    if (typeof window !== "undefined" && !suppressAutoRedirect) {
+      if (error.code === "FACE_MISMATCH_LOGOUT") {
+        clearAuthStorage();
+        window.location.replace("/login");
+      } else if (error.code === "TOKEN_REVOKED") {
+        clearAuthStorage();
+        window.location.replace("/login");
+      } else if (error.code === "FACE_VERIFICATION_REQUIRED") {
+        window.location.replace("/face-verification");
+      }
+    }
+
+    throw error;
   }
 
   return data as T;

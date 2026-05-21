@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { api } from "@/app/services/api";
+import { api, clearAuthStorage } from "@/app/services/api";
 import { AppMessageModal } from "@/components/AppMessageModal";
 import type { MessageVariant } from "@/components/AppMessageModal";
 import { OverlayPreloader } from "@/components/OverlayPreloader";
@@ -35,7 +35,7 @@ export default function LoginPage() {
 
   const loginMutation = useMutation({
     mutationFn: async (values: LoginFormValues) => {
-      const res = await api("/auth/login", {
+      const res = await api<{ access_token: string }>("/auth/login", {
         method: "POST",
         body: JSON.stringify({
           email: values.email.trim(),
@@ -48,14 +48,26 @@ export default function LoginPage() {
       localStorage.setItem("token", res.access_token);
 
       try {
-        const profile = await api("/auth/profile");
+        const profile = await api<{
+          role?: string;
+          hasFaceProfile?: boolean;
+          faceVerificationRequired?: boolean;
+        }>("/auth/profile");
         if (typeof profile.role === "string" && profile.role) {
           localStorage.setItem("role", profile.role);
         } else {
           localStorage.removeItem("role");
         }
+
+        const hasFace = Boolean(profile.hasFaceProfile);
+        const faceRequired = Boolean(profile.faceVerificationRequired);
+        if (!hasFace || faceRequired) {
+          router.replace("/face-verification");
+          return;
+        }
       } catch {
-        localStorage.removeItem("role");
+        clearAuthStorage();
+        throw new Error("Could not load profile after login.");
       }
 
       router.replace("/dashboard");

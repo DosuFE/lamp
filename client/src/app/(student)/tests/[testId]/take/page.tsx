@@ -3,10 +3,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { api } from "@/app/services/api";
+import { ApiError, api, clearAuthStorage } from "@/app/services/api";
 import { AppMessageModal } from "@/components/AppMessageModal";
 
 type Q = { id: number; question: string; options: string[] };
+type ResultSummary = {
+  score: number;
+  totalQuestions: number;
+  percentage: number;
+  grade: string;
+  malpracticeFlag?: boolean;
+};
 
 function reportTabSwitch(testId: string) {
   return api(`/tests/${testId}/report-tab-switch`, {
@@ -82,21 +89,27 @@ export default function TakeTestPage() {
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [remainingSec, setRemainingSec] = useState(0);
   const [startedAtIso, setStartedAtIso] = useState("");
-  const [resultSummary, setResultSummary] = useState<any>(null);
+  const [resultSummary, setResultSummary] = useState<ResultSummary | null>(null);
   const [tabSwitchCount, setTabSwitchCount] = useState(0);
   const [camLabel, setCamLabel] = useState<string>("Starting camera…");
   const [submitErrorOpen, setSubmitErrorOpen] = useState(false);
   const [submitErrorMessage, setSubmitErrorMessage] = useState("");
+  const [faceMismatchOpen, setFaceMismatchOpen] = useState(false);
+  const [faceMismatchImage, setFaceMismatchImage] = useState<string>("");
+  const [faceWarning, setFaceWarning] = useState("");
+  const [challenge, setChallenge] = useState("");
   const submittedRef = useRef(false);
   const deadlineRef = useRef<number | null>(null);
   const answersRef = useRef<Record<number, string>>({});
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const camStreamRef = useRef<MediaStream | null>(null);
   const webcamOffReportedRef = useRef(false);
 
   const storageKey = `cbt_${testId}_startedAt`;
-
-  answersRef.current = answers;
+  useEffect(() => {
+    answersRef.current = answers;
+  }, [answers]);
 
   const submit = useCallback(
     async (reason: "manual" | "timer") => {
@@ -113,14 +126,15 @@ export default function TakeTestPage() {
           }),
         });
         sessionStorage.removeItem(storageKey);
-        setResultSummary(res);
+        setResultSummary(res as ResultSummary);
         setPhase("done");
-      } catch (e: any) {
+      } catch (e: unknown) {
         submittedRef.current = false;
+        const message = e instanceof Error ? e.message : "";
         if (reason === "timer") {
-          setError(e.message || "Submit failed after time expired.");
+          setError(message || "Submit failed after time expired.");
         } else {
-          setSubmitErrorMessage(e.message || "Submit failed.");
+          setSubmitErrorMessage(message || "Submit failed.");
           setSubmitErrorOpen(true);
         }
       }
@@ -134,14 +148,17 @@ export default function TakeTestPage() {
 
     (async () => {
       try {
-        const qs = await api(`/tests/${testId}`);
+        const qs = await api<Q[]>(`/tests/${testId}`);
         if (cancelled) return;
         setQuestions(qs);
 
         await ensureDeviceLocation();
         if (cancelled) return;
 
-        const start = await api(`/tests/${testId}/start`, {
+        const start = await api<{
+          startedAt: string;
+          timeLimitSeconds: number;
+        }>(`/tests/${testId}/start`, {
           method: "POST",
           body: JSON.stringify({}),
         });
@@ -159,8 +176,9 @@ export default function TakeTestPage() {
         deadlineRef.current = Date.now() + left * 1000;
         setRemainingSec(left);
         setPhase("ready");
-      } catch (e: any) {
-        if (!cancelled) setError(e.message || "Could not start test.");
+      } catch (e: unknown) {
+        const message = e instanceof Error ? e.message : "";
+        if (!cancelled) setError(message || "Could not start test.");
       }
     })();
 
@@ -168,6 +186,19 @@ export default function TakeTestPage() {
       cancelled = true;
     };
   }, [testId, storageKey]);
+
+  useEffect(() => {
+    if (phase !== "ready" || !testId) return;
+
+    const loadChallenge = async () => {
+      try {
+        const res = await api<any>(`/tests/${testId}/face-challenge`);
+        setChallenge(res.challenge);
+      } catch {}
+    };
+
+    loadChallenge();
+  }, [phase, testId]);
 
   useEffect(() => {
     if (phase !== "ready" || !deadlineRef.current) return;
@@ -188,7 +219,6 @@ export default function TakeTestPage() {
     return () => window.clearInterval(id);
   }, [phase, submit]);
 
-  /** Leave exam tab / window → server increments tabSwitchCount + malpractice flag */
   useEffect(() => {
     if (phase !== "ready" || !testId) return;
 
@@ -205,7 +235,6 @@ export default function TakeTestPage() {
     return () => document.removeEventListener("visibilitychange", onVisibility);
   }, [phase, testId]);
 
-  /** Webcam: stream when allowed; report off when denied, track ends, or sustained mute */
   useEffect(() => {
     if (phase !== "ready" || !testId) return;
 
@@ -300,14 +329,111 @@ export default function TakeTestPage() {
       cancelled = true;
       detachTrackListeners?.();
       const s = streamHolder.stream ?? camStreamRef.current;
+      const videoEl = videoRef.current;
       streamHolder.stream = null;
       camStreamRef.current = null;
       s?.getTracks().forEach((t) => t.stop());
-      if (videoRef.current) {
-        videoRef.current.srcObject = null;
+      if (videoEl) {
+        videoEl.srcObject = null;
       }
     };
   }, [phase, testId]);
+
+  const getLiveCapture = useCallback((): string => {
+    const video = videoRef.current;
+    let canvas = canvasRef.current;
+    if (!video) {
+      throw new Error("Camera is not ready.");
+    }
+    if (!canvas) {
+      canvas = document.createElement("canvas");
+      canvasRef.current = canvas;
+    }
+    const width = video.videoWidth || 640;
+    const height = video.videoHeight || 480;
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Could not read camera frame.");
+    ctx.drawImage(video, 0, 0, width, height);
+    return canvas.toDataURL("image/jpeg", 0.72);
+  }, []);
+
+  const captureFrames = useCallback(async () => {
+    const frames: string[] = [];
+
+    for (let i = 0; i < 3; i++) {
+      frames.push(getLiveCapture());
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+
+    return frames;
+  }, [getLiveCapture]);
+
+  useEffect(() => {
+    if (phase !== "ready" || !testId) return;
+
+    let cancelled = false;
+    let inFlight = false;
+    let mismatchTriggered = false;
+
+    const runCheck = async () => {
+      if (cancelled || inFlight || mismatchTriggered) return;
+      const videoEl = videoRef.current;
+      if (!videoEl || videoEl.readyState < 2) return;
+
+      let frames: string[] = [];
+      try {
+        frames = await captureFrames();
+      } catch {
+        return;
+      }
+
+      inFlight = true;
+      try {
+        const res = await api<any>(
+        `/tests/${testId}/face-check`,
+        {
+          method: "POST",
+          body: JSON.stringify({ frames }),
+          suppressAutoRedirect: true,
+        }
+      );
+
+      if (res?.warning) {
+        setFaceWarning(
+          `Face mismatch warning ${res.warningCount}/5`
+        );
+
+        setTimeout(() => {
+          setFaceWarning("");
+        }, 4000);
+      }
+        } finally {
+          inFlight = false;
+        }
+      };
+
+    let timeoutId = 0;
+    const warmup = window.setTimeout(runCheck, 3500);
+
+    const scheduleNextCheck = () => {
+      const randomSeconds = Math.floor(Math.random() * 15) + 10;
+
+      timeoutId = window.setTimeout(async () => {
+        await runCheck();
+        scheduleNextCheck();
+      }, randomSeconds * 1000);
+    };
+
+    scheduleNextCheck();
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(warmup);
+      window.clearTimeout(timeoutId);
+    };
+  }, [phase, testId, captureFrames]);
 
   const formatTime = (sec: number) => {
     const m = Math.floor(sec / 60);
@@ -389,7 +515,44 @@ export default function TakeTestPage() {
         variant="error"
         onClose={() => setSubmitErrorOpen(false)}
       />
+      {faceMismatchOpen ? (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            className="w-full max-w-md rounded-2xl border border-red-500/40 bg-slate-900 p-6 shadow-2xl"
+          >
+            <h2 className="mb-2 text-lg font-semibold text-white">Face Verification</h2>
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-300">
+              Face is not the same with face verification.
+            </p>
+            {faceMismatchImage ? (
+              <div className="mt-4 overflow-hidden rounded-xl border border-white/10 bg-black">
+                <img
+                  src={faceMismatchImage}
+                  alt="Face captured during test"
+                  className="w-full aspect-video object-cover"
+                />
+              </div>
+            ) : null}
+            <p className="mt-4 text-xs text-slate-400">
+              Logging you out for security…
+            </p>
+          </div>
+        </div>
+      ) : null}
+      {faceWarning && (
+        <div className="fixed top-5 right-5 z-50 rounded-lg bg-yellow-500 px-4 py-3 text-black font-semibold shadow-lg">
+          {faceWarning}
+        </div>
+      )}
       <div className="mx-auto max-w-3xl space-y-6">
+        {challenge && (
+          <div className="rounded-xl bg-red-600/20 border border-red-500 p-4">
+            <p className="font-semibold">Security Check:</p>
+            <p>{challenge}</p>
+          </div>
+        )}
         <div
           className="rounded-xl border border-amber-500/30 bg-amber-950/40 px-4 py-3 text-sm text-amber-100/90"
           role="status"

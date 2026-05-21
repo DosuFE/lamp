@@ -9,13 +9,20 @@ import { AppMessageModal } from "@/components/AppMessageModal";
 import type { MessageVariant } from "@/components/AppMessageModal";
 import { OverlayPreloader } from "@/components/OverlayPreloader";
 
+type QuestionRow = {
+  id: number;
+  question: string;
+  options: string[];
+  correctAnswer: string;
+};
+
 export default function AdminTestQuestionsPage() {
   const router = useRouter();
   const params = useParams();
   const testId = String(params.testId ?? "");
 
   const [authorized, setAuthorized] = useState(false);
-  const [questions, setQuestions] = useState<any[]>([]);
+  const [questions, setQuestions] = useState<QuestionRow[]>([]);
   const [question, setQuestion] = useState("");
   const [optA, setOptA] = useState("");
   const [optB, setOptB] = useState("");
@@ -42,8 +49,8 @@ export default function AdminTestQuestionsPage() {
   );
 
   const load = useCallback(async () => {
-    const rows = await api(`/tests/${testId}/with-answers`);
-    setQuestions(rows);
+    const rows = await api<unknown>(`/tests/${testId}/with-answers`);
+    setQuestions(Array.isArray(rows) ? (rows as QuestionRow[]) : []);
   }, [testId]);
 
   useEffect(() => {
@@ -117,8 +124,9 @@ export default function AdminTestQuestionsPage() {
       setCorrect("");
       await load();
       showModal("Add question", "Question saved.", "success");
-    } catch (e: any) {
-      showModal("Add question", e.message || "Could not save question.", "error");
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "";
+      showModal("Add question", message || "Could not save question.", "error");
     } finally {
       setLoading(false);
     }
@@ -131,8 +139,9 @@ export default function AdminTestQuestionsPage() {
       await api(`/questions/${deleteId}`, { method: "DELETE" });
       await load();
       setDeleteId(null);
-    } catch (e: any) {
-      showModal("Delete question", e.message || "Could not delete.", "error");
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "";
+      showModal("Delete question", message || "Could not delete.", "error");
     } finally {
       setDeleteLoading(false);
     }

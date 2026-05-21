@@ -48,4 +48,19 @@ export class Result {
 
   @Column({ type: 'timestamp', nullable: true })
   submittedAt?: Date;
+
+  @Column({ default: 0 })
+  faceMismatchCount: number;
+
+  @Column({ default: false })
+  faceBlocked: boolean;
+
+  @Column({ nullable: true })
+  currentFaceChallenge?: string;
+
+  @Column('simple-array', { nullable: true })
+  evidenceImages?: string[];
+
+  @Column({ default: false })
+  challengePassed!: boolean;
 }

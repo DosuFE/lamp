@@ -7,11 +7,19 @@ import {
   LectureVideoPlayer,
 } from "@/components/LectureAssets";
 
+type LectureRow = {
+  id: number;
+  title: string;
+  content?: string | null;
+  videoUrl?: string | null;
+  pdfUrl?: string | null;
+};
+
 export default function LecturesPage() {
   const { id } = useParams();
   const router = useRouter();
 
-  const [lectures, setLectures] = useState([]);
+  const [lectures, setLectures] = useState<LectureRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -26,12 +34,13 @@ export default function LecturesPage() {
 
     const fetchLectures = async () => {
       try {
-        const data = await api(`/lectures/course/${courseId}`);
-        setLectures(data);
-      } catch (err: any) {
+        const data = await api<unknown>(`/lectures/course/${courseId}`);
+        setLectures(Array.isArray(data) ? (data as LectureRow[]) : []);
+      } catch (err: unknown) {
         console.error(err);
+        const message = err instanceof Error ? err.message : "";
 
-        if (err.message.includes("not enrolled")) {
+        if (message.includes("not enrolled")) {
           setError("You are not enrolled in this course");
         } else {
           setError("Failed to load lectures");
@@ -84,7 +93,7 @@ export default function LecturesPage() {
       <h1 className="mb-6 text-2xl font-bold">Course Lectures</h1>
 
       <div className="grid gap-4">
-        {lectures.map((lec: any) => (
+        {lectures.map((lec) => (
           <div
             key={lec.id}
             className="rounded-lg border border-white/10 bg-slate-900 p-4"

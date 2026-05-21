@@ -52,10 +52,11 @@ export default function AdminCourses() {
   const fetchCourses = useCallback(async () => {
     setCoursesLoading(true);
     try {
-      const data = await api("/courses");
-      setCourses(data);
-    } catch (err: any) {
-      openModal(err.message || "Could not load courses.", "error", "Courses");
+      const data = await api<unknown>("/courses");
+      setCourses(Array.isArray(data) ? (data as Course[]) : []);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "";
+      openModal(message || "Could not load courses.", "error", "Courses");
     } finally {
       setCoursesLoading(false);
     }
@@ -105,8 +106,13 @@ export default function AdminCourses() {
       setDepartment("");
       setDescription("");
       void fetchCourses();
-    } catch (err: any) {
-      openModal(err.message || "Could not create course.", "error", "Create course");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "";
+      openModal(
+        message || "Could not create course.",
+        "error",
+        "Create course",
+      );
     } finally {
       setLoading(false);
     }

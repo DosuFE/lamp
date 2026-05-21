@@ -8,14 +8,18 @@ import {
   Post,
   Request,
   UseGuards,
+  UsePipes,
+  ValidationPipe,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { Roles } from '../auth/decorators/roles.decorators';
 import { RolesGuard } from '../auth/roles/roles.guard';
 import { TestsService } from './tests.service';
+import { FaceVerifiedGuard } from 'src/auth/guards/face-verified.guard';
+import { FaceFramesDto } from 'src/auth/dto/face-capture.dto';
 
 @Controller('tests')
-@UseGuards(AuthGuard('jwt'), RolesGuard)
+@UseGuards(AuthGuard('jwt'), FaceVerifiedGuard, RolesGuard)
 export class TestsController {
   constructor(private readonly testService: TestsService) {}
 
@@ -80,6 +84,31 @@ export class TestsController {
       +id,
       Boolean(body?.isOn),
     );
+  }
+
+  @Post(':testId/face-check')
+  @UsePipes(
+    new ValidationPipe({
+      transform: true,
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    }),
+  )
+  faceCheck(
+    @Param('testId') id: number,
+    @Body() dto: FaceFramesDto,
+    @Request() req,
+  ) {
+    return this.testService.verifyLiveFaceDuringTest(
+      req.user.userId,
+      +id,
+      dto.frames,
+    );
+  }
+
+  @Get(':testId/face-challenge')
+  getChallenge(@Param('testId') id: number, @Request() req) {
+    return this.testService.getFaceChallenge(req.user.userId, +id);
   }
 
   @Post(':testId/submit')

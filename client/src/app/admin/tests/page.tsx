@@ -8,12 +8,15 @@ import { AppMessageModal } from "@/components/AppMessageModal";
 import type { MessageVariant } from "@/components/AppMessageModal";
 import { OverlayPreloader } from "@/components/OverlayPreloader";
 
+type CourseRow = { id: number; title: string };
+type TestRow = { id: number; title: string; duration: number };
+
 export default function AdminTestsPage() {
   const router = useRouter();
   const [authorized, setAuthorized] = useState(false);
-  const [courses, setCourses] = useState<any[]>([]);
+  const [courses, setCourses] = useState<CourseRow[]>([]);
   const [courseId, setCourseId] = useState("");
-  const [tests, setTests] = useState<any[]>([]);
+  const [tests, setTests] = useState<TestRow[]>([]);
   const [title, setTitle] = useState("");
   const [duration, setDuration] = useState("30");
   const [loading, setLoading] = useState(false);
@@ -44,11 +47,12 @@ export default function AdminTestsPage() {
     (async () => {
       setCoursesLoading(true);
       try {
-        const list = await api("/courses");
-        setCourses(list);
-      } catch (e: any) {
+        const list = await api<unknown>("/courses");
+        setCourses(Array.isArray(list) ? (list as CourseRow[]) : []);
+      } catch (e: unknown) {
+        const message = e instanceof Error ? e.message : "";
         setCourses([]);
-        showModal("Courses", e.message || "Could not load courses.", "error");
+        showModal("Courses", message || "Could not load courses.", "error");
       } finally {
         setCoursesLoading(false);
       }
@@ -56,15 +60,12 @@ export default function AdminTestsPage() {
   }, [router, showModal]);
 
   useEffect(() => {
-    if (!courseId) {
-      setTests([]);
-      return;
-    }
+    if (!courseId) return;
     (async () => {
       setTestsLoading(true);
       try {
-        const list = await api(`/tests/course/${courseId}`);
-        setTests(list);
+        const list = await api<unknown>(`/tests/course/${courseId}`);
+        setTests(Array.isArray(list) ? (list as TestRow[]) : []);
       } catch {
         setTests([]);
       } finally {
@@ -102,11 +103,12 @@ export default function AdminTestsPage() {
         }),
       });
       setTitle("");
-      const list = await api(`/tests/course/${courseId}`);
-      setTests(list);
+      const list = await api<unknown>(`/tests/course/${courseId}`);
+      setTests(Array.isArray(list) ? (list as TestRow[]) : []);
       showModal("Create test", "Test created successfully.", "success");
-    } catch (e: any) {
-      showModal("Create test", e.message || "Could not create test.", "error");
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "";
+      showModal("Create test", message || "Could not create test.", "error");
     } finally {
       setLoading(false);
     }
@@ -146,7 +148,10 @@ export default function AdminTestsPage() {
           <label className="block text-sm text-slate-400 mb-2">Course</label>
           <select
             value={courseId}
-            onChange={(e) => setCourseId(e.target.value)}
+            onChange={(e) => {
+              setCourseId(e.target.value);
+              setTests([]);
+            }}
             className="w-full rounded-lg bg-slate-800 p-3 border border-white/10"
           >
             <option value="">Select course…</option>
