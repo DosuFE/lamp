@@ -3,7 +3,7 @@
 export function getApiBase() {
   // Default to Next.js rewrite proxy (`/api/*` -> backend) so local dev works
   // without configuring env vars.
-  return (process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api").replace(/\/$/, "");
+  return (process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://lamp-3-pfnr.onrender.com/").replace(/\/$/, "");
 }
 
 const API_BASE = getApiBase();
